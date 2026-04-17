@@ -48,17 +48,54 @@ export const useReviewStore = create<ReviewState>((set) => ({
     })),
 
   addItems: (items) =>
-    set((state) => ({
-      items: [
-        ...state.items,
-        ...items.map((item) => ({
-          ...item,
-          id: `review-${++counter}`,
-          resolved: false,
-          createdAt: Date.now(),
-        })),
-      ],
-    })),
+    set((state) => {
+      // De-dupe against pending items with same type + normalized title
+      // Merge affectedPages / searchQueries / sourcePath instead of creating duplicates
+      const result = [...state.items]
+      const keyFor = (t: string, title: string) => `${t}::${title.trim().toLowerCase()}`
+
+      // Build index of existing pending items for fast lookup
+      const pendingIndex = new Map<string, number>()
+      result.forEach((it, idx) => {
+        if (!it.resolved && (it.type === "missing-page" || it.type === "duplicate" || it.type === "suggestion")) {
+          pendingIndex.set(keyFor(it.type, it.title), idx)
+        }
+      })
+
+      for (const incoming of items) {
+        const k = keyFor(incoming.type, incoming.title)
+        const existingIdx = (incoming.type === "missing-page" || incoming.type === "duplicate" || incoming.type === "suggestion")
+          ? pendingIndex.get(k)
+          : undefined
+
+        if (existingIdx !== undefined) {
+          // Merge into existing
+          const old = result[existingIdx]
+          const mergedPages = Array.from(new Set([...(old.affectedPages ?? []), ...(incoming.affectedPages ?? [])]))
+          const mergedQueries = Array.from(new Set([...(old.searchQueries ?? []), ...(incoming.searchQueries ?? [])]))
+          result[existingIdx] = {
+            ...old,
+            description: incoming.description || old.description, // prefer newer description
+            sourcePath: incoming.sourcePath ?? old.sourcePath,
+            affectedPages: mergedPages.length > 0 ? mergedPages : undefined,
+            searchQueries: mergedQueries.length > 0 ? mergedQueries : undefined,
+          }
+        } else {
+          const newItem = {
+            ...incoming,
+            id: `review-${++counter}`,
+            resolved: false,
+            createdAt: Date.now(),
+          }
+          result.push(newItem)
+          if (incoming.type === "missing-page" || incoming.type === "duplicate" || incoming.type === "suggestion") {
+            pendingIndex.set(k, result.length - 1)
+          }
+        }
+      }
+
+      return { items: result }
+    }),
 
   setItems: (items) => set({ items }),
 

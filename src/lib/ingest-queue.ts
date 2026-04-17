@@ -22,6 +22,9 @@ let processing = false
 let currentProjectPath = ""
 let currentAbortController: AbortController | null = null
 let lastWrittenFiles: string[] = []  // track files written by current ingest for cleanup
+// Track whether any task has been processed since the last drain.
+// Prevents the sweep from running on every idle/no-op call.
+let processedSinceDrain = false
 
 // ── Persistence ───────────────────────────────────────────────────────────
 
@@ -211,6 +214,7 @@ export function clearQueueState(): void {
   currentProjectPath = ""
   currentAbortController = null
   lastWrittenFiles = []
+  processedSinceDrain = false
 }
 
 // ── Restore on startup ───────────────────────────────────────────────────
@@ -257,11 +261,29 @@ export async function restoreQueue(projectPath: string): Promise<void> {
 
 const MAX_RETRIES = 3
 
+async function onQueueDrained(projectPath: string): Promise<void> {
+  if (!processedSinceDrain) return
+  processedSinceDrain = false
+
+  try {
+    const { sweepResolvedReviews } = await import("@/lib/sweep-reviews")
+    await sweepResolvedReviews(projectPath)
+  } catch (err) {
+    console.error("[Ingest Queue] Failed to load sweep-reviews:", err)
+  }
+}
+
 async function processNext(projectPath: string): Promise<void> {
   if (processing) return
 
   const next = queue.find((t) => t.status === "pending")
-  if (!next) return
+  if (!next) {
+    // Queue drained — trigger review cleanup (auto-resolve stale items)
+    onQueueDrained(projectPath).catch((err) =>
+      console.error("[Ingest Queue] sweep failed:", err)
+    )
+    return
+  }
 
   processing = true
   next.status = "processing"
@@ -298,6 +320,7 @@ async function processNext(projectPath: string): Promise<void> {
     currentAbortController = null
     lastWrittenFiles = []
     queue = queue.filter((t) => t.id !== next.id)
+    processedSinceDrain = true
     await saveQueue(pp)
 
     console.log(`[Ingest Queue] Done: ${next.sourcePath}`)
