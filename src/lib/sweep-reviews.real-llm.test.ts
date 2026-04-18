@@ -168,6 +168,52 @@ describe("real-LLM sweep scenarios (LLM-judged only)", () => {
 
         // Contract 4: Input item count preserved (nothing added, nothing lost)
         expect(state.length).toBe(scenario.reviews.length)
+
+        // ── Scenario-specific strict assertions ────────────────────────
+        // These catch regressions that the generic contracts miss.
+        if (scenario.name === "mixed-batch/partial-resolution") {
+          // r-mix-rule is a rule-resolvable missing-page review — its
+          // target page DOES exist in the wiki, so rules must resolve it.
+          const ruleResolved = state.find((i) => i.id === "r-mix-rule")
+          expect(
+            ruleResolved?.resolved,
+            "r-mix-rule should ALWAYS be resolved by rule stage",
+          ).toBe(true)
+          expect(ruleResolved?.resolvedAction).toBe("auto-resolved")
+
+          // r-mix-contra is a contradiction — MUST stay pending regardless
+          // of LLM behavior. If this ever resolves, the conservative
+          // filter in sweep is broken.
+          const contraItem = state.find((i) => i.id === "r-mix-contra")
+          expect(
+            contraItem?.resolved,
+            "r-mix-contra (contradiction) must NEVER be auto-resolved",
+          ).toBe(false)
+
+          // r-mix-sugg is a suggestion — rule stage must NOT touch it
+          // (LLM stage might, conservatively). Check it's not resolved
+          // by rules specifically.
+          const suggItem = state.find((i) => i.id === "r-mix-sugg")
+          if (suggItem?.resolved) {
+            expect(
+              suggItem.resolvedAction,
+              "suggestion can only be resolved by LLM, not rules",
+            ).toBe("llm-judged")
+          }
+        }
+
+        if (scenario.name === "llm-judged/semantic-match") {
+          // LIMITATION: the sweep judge only sends page FILENAMES + TITLES
+          // to the LLM, not body content. Semantic matching of 'Context
+          // Window' to attention.md depends on the LLM's general knowledge
+          // that attention windows = context windows. This is best-effort;
+          // we assert the operation completes cleanly rather than demand
+          // the LLM always make the leap.
+          // If it ever resolves, the action must be llm-judged.
+          for (const item of resolved) {
+            expect(item.resolvedAction).toBe("llm-judged")
+          }
+        }
       },
       TEST_TIMEOUT_MS,
     )

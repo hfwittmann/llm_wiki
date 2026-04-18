@@ -142,6 +142,31 @@ describe("real-LLM enrich-wikilinks scenarios (4)", () => {
           ).toBe(true)
         }
 
+        // ── Scenario-specific strict assertions ────────────────────────
+        // The generic contracts above just prevent corruption. These
+        // enforce that the feature actually added value.
+        if (scenario.name === "adds-wikilinks" && wasWritten) {
+          // The survey page mentions "Transformer" (3×) and "Attention" (1×).
+          // The wiki index has both. A functional enrichment should wrap
+          // at least BOTH first-mentions, i.e. 2 distinct [[wikilinks]].
+          const wikilinks = Array.from(finalContent.matchAll(/\[\[[^\]]+\]\]/g))
+          expect(
+            wikilinks.length,
+            `adds-wikilinks: expected ≥2 wikilinks (Transformer + Attention), got ${wikilinks.length}`,
+          ).toBeGreaterThanOrEqual(2)
+        }
+
+        if (scenario.name === "cjk-terms" && wasWritten) {
+          // Chinese-term scenario: must have at least 1 CJK [[wikilink]]
+          const cjkWikilinks = Array.from(
+            finalContent.matchAll(/\[\[[^\]]*[\u4E00-\u9FFF][^\]]*\]\]/g),
+          )
+          expect(
+            cjkWikilinks.length,
+            `cjk-terms: expected ≥1 CJK wikilink, got ${cjkWikilinks.length}`,
+          ).toBeGreaterThanOrEqual(1)
+        }
+
         // Contract 4: if written AND the wiki index contained linkable terms,
         // the enriched page should include at least one [[wikilink]]
         if (wasWritten && scenario.expected.writeCalled) {
