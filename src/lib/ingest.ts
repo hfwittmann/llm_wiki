@@ -90,6 +90,7 @@ export async function autoIngest(
       },
     },
     signal,
+    { temperature: 0.1 },
   )
 
   if (useActivityStore.getState().items.find((i) => i.id === activityId)?.status === "error") {
@@ -139,6 +140,7 @@ export async function autoIngest(
       },
     },
     signal,
+    { temperature: 0.1 },
   )
 
   if (useActivityStore.getState().items.find((i) => i.id === activityId)?.status === "error") {
