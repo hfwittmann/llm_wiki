@@ -106,4 +106,69 @@ export const searchScenarios: SearchScenario[] = [
       // 'other' uses "the" a lot but should be filtered out and not rank top
     },
   },
+
+  // 6. filename-exact-match-wins — the page whose filename stem EQUALS the
+  //    query must rank #1 even when longer, denser pages also mention the
+  //    word many times. Regression guard for the "精准匹配排到最后" bug.
+  {
+    name: "filename-exact-match-wins",
+    description:
+      "Query 'attention'. Many pages contain 'attention' in title AND body. " +
+      "Only attention.md has the exact filename match — it must rank first.",
+    initialWiki: {
+      "wiki/attention.md": page("Attention", "Attention is a weighting mechanism."),
+      "wiki/multi-head-attention.md": page(
+        "Multi-Head Attention",
+        "Multi-head attention extends attention across multiple heads. " +
+          "Attention weights are computed per head and combined. " +
+          "Each head attends to different patterns. Attention attention attention.",
+      ),
+      "wiki/self-attention-history.md": page(
+        "Self-Attention: A History",
+        "Self-attention appeared before multi-head attention. " +
+          "Attention, attention, attention — the dominant mechanism in NLP.",
+      ),
+      "wiki/transformer-deep-dive.md": page(
+        "Transformer Deep Dive",
+        "The transformer uses attention everywhere. Attention in encoder, " +
+          "attention in decoder, cross-attention between them. Attention rules.",
+      ),
+    },
+    query: "attention",
+    expected: {
+      topResultPaths: ["wiki/attention.md"],
+      titleMatchPaths: [
+        "wiki/attention.md",
+        "wiki/multi-head-attention.md",
+        "wiki/self-attention-history.md",
+      ],
+    },
+  },
+
+  // 7. phrase-in-content-beats-scattered-tokens — a page that contains the
+  //    raw query phrase should outrank a page with the same tokens scattered.
+  {
+    name: "phrase-in-content-beats-scattered-tokens",
+    description:
+      "Query 'self-attention'. tokens split to ['self','attention']. " +
+      "The page containing the literal phrase 'self-attention' should " +
+      "outrank the page where 'self' and 'attention' appear separately.",
+    initialWiki: {
+      "wiki/phrase-page.md": page(
+        "Mechanisms",
+        "This discusses self-attention, the key building block of transformers. " +
+          "Self-attention is what makes transformers powerful.",
+      ),
+      "wiki/scattered-page.md": page(
+        "Scattered",
+        "Self-improvement is a goal. Attention to detail is important. " +
+          "Self-help books discuss attention spans. " +
+          "This page talks about self and about attention separately.",
+      ),
+    },
+    query: "self-attention",
+    expected: {
+      topResultPaths: ["wiki/phrase-page.md"],
+    },
+  },
 ]
