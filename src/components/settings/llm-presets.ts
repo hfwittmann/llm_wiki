@@ -312,16 +312,20 @@ export const LLM_PRESETS: LlmPreset[] = [
     // through Tauri's HTTP plugin — see src/lib/llm-client.ts.
     baseUrl: "https://ark.cn-beijing.volces.com/api/coding/v3",
     apiMode: "chat_completions",
-    // Current Volcengine Ark model families. Users commonly bring their
-    // own endpoint id (ep-xxx…) via the custom text input when they have
-    // a private deployment provisioned on the console.
+    // Exact model catalog Volcengine's Coding product line accepts on
+    // this endpoint. The older `doubao-*-1-5-*` / `doubao-seed-1-6-*` /
+    // `deepseek-v3-250324` ids that work on the general Ark endpoints
+    // are NOT available here and will 400.
+    defaultModel: "Doubao-Seed-2.0-Code",
     suggestedModels: [
-      "doubao-seed-1-6-250615",
-      "doubao-1-5-pro-32k-250115",
-      "doubao-1-5-pro-256k-250115",
-      "doubao-1-5-lite-32k-250115",
-      "deepseek-v3-250324",
-      "deepseek-r1-250528",
+      "Doubao-Seed-2.0-Code",
+      "Doubao-Seed-2.0-pro",
+      "Doubao-Seed-2.0-lite",
+      "Doubao-Seed-Code",
+      "MiniMax-M2.5",
+      "Kimi-K2.5",
+      "GLM-4.7",
+      "DeepSeek-V3",
     ],
     suggestedContextSize: 128000,
   },
