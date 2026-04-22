@@ -110,7 +110,13 @@
       },
       "embedding": {
         "title": "向量嵌入",
-        "description": "开启后可对 wiki 页面进行语义检索。嵌入接口在 ingest 时和查询时都会调用。"
+        "description": "启用语义搜索。对任何 OpenAI 兼容的 /v1/embeddings endpoint 工作。本地模型（如 LM Studio、Ollama embedding）不需要 API Key。",
+        "enableLabel": "启用向量搜索",
+        "enableHint": "关掉后搜索只走 token 匹配。",
+        "endpoint": "Endpoint",
+        "apiKey": "API Key（可选）",
+        "apiKeyPlaceholder": "本地模型留空即可",
+        "model": "Model"
       },
       "webSearch": {
         "title": "网页搜索",

@@ -110,7 +110,13 @@
       },
       "embedding": {
         "title": "Vector Embeddings",
-        "description": "Enable semantic search over wiki pages. The embedding endpoint runs at ingest time and at query time."
+        "description": "Enable semantic search against your wiki. Works with any OpenAI-compatible /v1/embeddings endpoint. Local models (LM Studio, Ollama embedding) don't need an API key.",
+        "enableLabel": "Enable vector search",
+        "enableHint": "When off, search uses token matching only.",
+        "endpoint": "Endpoint",
+        "apiKey": "API Key (optional)",
+        "apiKeyPlaceholder": "Leave empty for local models",
+        "model": "Model"
       },
       "webSearch": {
         "title": "Web Search",

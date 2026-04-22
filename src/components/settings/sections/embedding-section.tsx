@@ -21,9 +21,9 @@ export function EmbeddingSection({ draft, setDraft }: Props) {
 
       <div className="flex items-center justify-between rounded-md border p-3">
         <div>
-          <div className="text-sm font-medium">启用向量搜索</div>
+          <div className="text-sm font-medium">{t("settings.sections.embedding.enableLabel")}</div>
           <div className="text-xs text-muted-foreground">
-            关掉后搜索只走 token 匹配。
+            {t("settings.sections.embedding.enableHint")}
           </div>
         </div>
         <button
@@ -44,7 +44,7 @@ export function EmbeddingSection({ draft, setDraft }: Props) {
       {draft.embeddingEnabled && (
         <>
           <div className="space-y-2">
-            <Label>Endpoint</Label>
+            <Label>{t("settings.sections.embedding.endpoint")}</Label>
             <Input
               value={draft.embeddingEndpoint}
               onChange={(e) => setDraft("embeddingEndpoint", e.target.value)}
@@ -53,17 +53,17 @@ export function EmbeddingSection({ draft, setDraft }: Props) {
           </div>
 
           <div className="space-y-2">
-            <Label>API Key (optional)</Label>
+            <Label>{t("settings.sections.embedding.apiKey")}</Label>
             <Input
               type="password"
               value={draft.embeddingApiKey}
               onChange={(e) => setDraft("embeddingApiKey", e.target.value)}
-              placeholder="本地模型留空即可"
+              placeholder={t("settings.sections.embedding.apiKeyPlaceholder")}
             />
           </div>
 
           <div className="space-y-2">
-            <Label>Model</Label>
+            <Label>{t("settings.sections.embedding.model")}</Label>
             <Input
               value={draft.embeddingModel}
               onChange={(e) => setDraft("embeddingModel", e.target.value)}
