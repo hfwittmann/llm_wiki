@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react"
 import { ChevronDown, ChevronRight, AlertCircle, CheckCircle2 } from "lucide-react"
+import { useTranslation } from "react-i18next"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useWikiStore, type ProviderOverride } from "@/stores/wiki-store"
@@ -9,6 +10,7 @@ import { resolveConfig } from "../preset-resolver"
 import { normalizeEndpoint } from "@/lib/endpoint-normalizer"
 
 export function LlmProviderSection() {
+  const { t } = useTranslation()
   const providerConfigs = useWikiStore((s) => s.providerConfigs)
   const setProviderConfigs = useWikiStore((s) => s.setProviderConfigs)
   const activePresetId = useWikiStore((s) => s.activePresetId)
@@ -62,10 +64,9 @@ export function LlmProviderSection() {
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-xl font-semibold">LLM 模型</h2>
+        <h2 className="text-xl font-semibold">{t("settings.sections.llm.title")}</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          每个厂商一条独立配置。打开开关即切换为当前活跃 provider;其他的会自动关闭。
-          配置改动即时保存,每个厂商的 API Key 独立存储,切换之间不丢失。
+          {t("settings.sections.llm.description")}
         </p>
       </div>
 

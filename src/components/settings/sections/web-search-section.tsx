@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import type { SettingsDraft, DraftSetter } from "../settings-types"
@@ -8,6 +9,7 @@ interface Props {
 }
 
 export function WebSearchSection({ draft, setDraft }: Props) {
+  const { t } = useTranslation()
   const options = [
     { value: "none" as const, label: "Disabled" },
     { value: "tavily" as const, label: "Tavily" },
@@ -16,14 +18,14 @@ export function WebSearchSection({ draft, setDraft }: Props) {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-semibold">网页搜索 (Deep Research)</h2>
+        <h2 className="text-xl font-semibold">{t("settings.sections.webSearch.title")} (Deep Research)</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          允许 AI 在发现知识缺口时自动调用网页搜索补充资料。目前接入 Tavily。
+          {t("settings.sections.webSearch.description")}
         </p>
       </div>
 
       <div className="space-y-2">
-        <Label>搜索 Provider</Label>
+        <Label>{t("settings.sections.webSearch.provider", { defaultValue: "Search Provider" })}</Label>
         <div className="flex flex-wrap gap-2">
           {options.map((p) => {
             const active = draft.searchProvider === p.value

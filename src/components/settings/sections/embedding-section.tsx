@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import type { SettingsDraft, DraftSetter } from "../settings-types"
@@ -8,13 +9,13 @@ interface Props {
 }
 
 export function EmbeddingSection({ draft, setDraft }: Props) {
+  const { t } = useTranslation()
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-semibold">向量嵌入</h2>
+        <h2 className="text-xl font-semibold">{t("settings.sections.embedding.title")}</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          启用语义搜索。对任何 OpenAI 兼容的 /v1/embeddings endpoint 工作。
-          本地模型(如 LM Studio、Ollama embedding)不需要 API Key。
+          {t("settings.sections.embedding.description")}
         </p>
       </div>
 

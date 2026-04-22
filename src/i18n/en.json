@@ -89,10 +89,67 @@
     "customEndpointHint": "Any OpenAI-compatible API endpoint (e.g., LiteLLM, vLLM, LocalAI, Azure OpenAI)",
     "customApiKey": "Enter API key (if required)",
     "modelPlaceholder": "Enter model name",
-    "save": "Save Settings",
-    "saved": "Saved!",
+    "save": "Save",
+    "saved": "Saved",
+    "savedTick": "Saved ✓",
+    "changeHint": "Changes apply after saving.",
     "language": "Language",
-    "languageHint": "Interface language (wiki content follows source material language)"
+    "languageHint": "Interface language (wiki content follows source material language)",
+    "categories": {
+      "llm": "LLM Models",
+      "embedding": "Embeddings",
+      "webSearch": "Web Search",
+      "output": "Output",
+      "interface": "Interface",
+      "about": "About"
+    },
+    "sections": {
+      "llm": {
+        "title": "LLM Models",
+        "description": "One row per vendor. Toggling one on automatically turns off the others. Changes save instantly; each vendor's API key is stored independently so switching doesn't lose data."
+      },
+      "embedding": {
+        "title": "Vector Embeddings",
+        "description": "Enable semantic search over wiki pages. The embedding endpoint runs at ingest time and at query time."
+      },
+      "webSearch": {
+        "title": "Web Search",
+        "description": "Used by Deep Research to pull fresh external context."
+      },
+      "output": {
+        "title": "Output Preferences",
+        "description": "Controls for generated content — language, conversation history length.",
+        "aiLanguage": "AI Output Language",
+        "aiLanguageHint": "Force AI-generated content (chat replies, wiki pages, research output, lint reports) to use the selected language. Pick \"Auto\" to let the AI follow the user's input or source document language.",
+        "historyLength": "Conversation History Length",
+        "historyHint": "Number of prior messages sent to the AI on each request. More = richer context but more tokens.",
+        "historyCurrent": "Currently {{count}} messages (about {{turns}} turns)"
+      },
+      "interface": {
+        "title": "Interface",
+        "description": "UI language and appearance. Changes apply immediately and persist.",
+        "uiLanguage": "UI Language",
+        "uiLanguageHint": "Affects labels, buttons, and other UI strings only. The AI output language is set separately in Output Preferences."
+      },
+      "about": {
+        "title": "About",
+        "description": "Build info and runtime status.",
+        "version": "Version",
+        "clipServer": "Clip Server",
+        "updateCheck": "Update Check",
+        "lastChecked": "Last checked",
+        "lastCheckedNever": "Never",
+        "unreachable": "couldn't reach GitHub",
+        "checkNow": "Check now",
+        "checking": "Checking…",
+        "upToDate": "Up to date (v{{version}}).",
+        "updateAvailable": "Update available: v{{version}}",
+        "openDownload": "Open download page",
+        "later": "Later",
+        "autoCheck": "Check for updates automatically on startup (at most once every 6 hours)",
+        "appDescription": "An LLM-driven personal knowledge base. Source:"
+      }
+    }
   },
   "preview": {
     "selectFile": "Select a file to preview",
@@ -105,5 +162,11 @@
   },
   "fileTree": {
     "noProject": "No project open"
+  },
+  "time": {
+    "justNow": "just now",
+    "minutesAgo": "{{count}} min ago",
+    "hoursAgo": "{{count}} h ago",
+    "daysAgo": "{{count}} d ago"
   }
 }

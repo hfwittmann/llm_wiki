@@ -7,6 +7,7 @@ import {
   Palette,
   Info,
 } from "lucide-react"
+import { useTranslation } from "react-i18next"
 import i18n from "@/i18n"
 import { Button } from "@/components/ui/button"
 import { useWikiStore } from "@/stores/wiki-store"
@@ -30,17 +31,20 @@ type CategoryId =
 
 interface Category {
   id: CategoryId
-  label: string
+  /** i18n key under settings.categories — resolved at render time so
+   *  switching language in Settings → Interface takes effect without
+   *  remounting this component (Bug #53). */
+  labelKey: string
   icon: typeof Bot
 }
 
 const CATEGORIES: Category[] = [
-  { id: "llm", label: "LLM 模型", icon: Bot },
-  { id: "embedding", label: "向量嵌入", icon: Binary },
-  { id: "web-search", label: "网页搜索", icon: Globe },
-  { id: "output", label: "输出偏好", icon: Languages },
-  { id: "interface", label: "界面", icon: Palette },
-  { id: "about", label: "关于", icon: Info },
+  { id: "llm", labelKey: "settings.categories.llm", icon: Bot },
+  { id: "embedding", labelKey: "settings.categories.embedding", icon: Binary },
+  { id: "web-search", labelKey: "settings.categories.webSearch", icon: Globe },
+  { id: "output", labelKey: "settings.categories.output", icon: Languages },
+  { id: "interface", labelKey: "settings.categories.interface", icon: Palette },
+  { id: "about", labelKey: "settings.categories.about", icon: Info },
 ]
 
 function initialDraft(
@@ -72,6 +76,7 @@ function initialDraft(
 }
 
 export function SettingsView() {
+  const { t } = useTranslation()
   const llmConfig = useWikiStore((s) => s.llmConfig)
   const setLlmConfig = useWikiStore((s) => s.setLlmConfig)
   const searchApiConfig = useWikiStore((s) => s.searchApiConfig)
@@ -198,7 +203,7 @@ export function SettingsView() {
           pattern so the two navigational surfaces feel like one app. */}
       <aside className="flex w-56 shrink-0 flex-col border-r bg-muted/30">
         <div className="px-4 pb-2 pt-4 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Settings
+          {t("settings.title")}
         </div>
         <nav className="flex-1 overflow-y-auto px-2 pb-3">
           {CATEGORIES.map((c) => {
@@ -221,7 +226,7 @@ export function SettingsView() {
                     isActive ? "text-primary" : "text-muted-foreground/80 group-hover:text-accent-foreground"
                   }`}
                 />
-                <span className="truncate">{c.label}</span>
+                <span className="truncate">{t(c.labelKey)}</span>
               </button>
             )
           })}
@@ -241,10 +246,10 @@ export function SettingsView() {
           <div className="shrink-0 border-t bg-background/80 backdrop-blur px-8 py-3">
             <div className="mx-auto flex max-w-2xl items-center justify-between gap-4">
               <p className="text-xs text-muted-foreground">
-                {saved ? "已保存 ✓" : "改动会在保存后应用。"}
+                {saved ? t("settings.savedTick") : t("settings.changeHint")}
               </p>
               <Button onClick={handleSave}>
-                {saved ? "Saved" : "Save"}
+                {saved ? t("settings.saved") : t("settings.save")}
               </Button>
             </div>
           </div>
