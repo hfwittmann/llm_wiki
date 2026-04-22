@@ -193,6 +193,7 @@ export const LLM_PRESETS: LlmPreset[] = [
       "deepseek-ai/deepseek-v3.2",
       "moonshotai/kimi-k2.6",
       "qwen/qwen3.5-397b-a17b",
+      "minimaxai/minimax-m2.7",
       "minimaxai/minimax-m2.5",
       "z-ai/glm5",
       "openai/gpt-oss-120b",
