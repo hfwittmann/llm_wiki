@@ -10,10 +10,148 @@ import { checkIngestCache, saveIngestCache } from "@/lib/ingest-cache"
 import { buildLanguageDirective } from "@/lib/output-language"
 import { detectLanguage } from "@/lib/detect-language"
 
-// Path capture group allows any non-newline char so hyphenated paths like
-// "wiki/concepts/multi-head-attention.md" are accepted. The lazy `+?` plus
-// the following `\s*---\n` anchor still stops at the closing ---.
-const FILE_BLOCK_REGEX = /---FILE:\s*([^\n]+?)\s*---\n([\s\S]*?)---END FILE---/g
+// Legacy export kept for backward compatibility with existing diagnostic
+// tests. The live pipeline goes through parseFileBlocks() below, which
+// handles classes of LLM output this regex silently drops (see H1/H3/H5
+// in src/lib/ingest-parse.test.ts).
+export const FILE_BLOCK_REGEX = /---FILE:\s*([^\n]+?)\s*---\n([\s\S]*?)---END FILE---/g
+
+/** One FILE block extracted from an LLM's stage-2 output. */
+export interface ParsedFileBlock {
+  path: string
+  content: string
+}
+
+/** What the parser produced, with any non-fatal issues surfaced. */
+export interface ParseFileBlocksResult {
+  blocks: ParsedFileBlock[]
+  /** Human-readable notes for blocks we refused or couldn't close. Each
+   *  one is also console.warn'd. UI can surface these so users see that
+   *  something was skipped instead of silently getting fewer pages. */
+  warnings: string[]
+}
+
+// Line-level openers / closers. Both are case-insensitive, tolerant of
+// extra interior whitespace (`--- END FILE ---`), and anchored to the
+// whole trimmed line so a stray `---END FILE---` inside prose or a list
+// item (`- ---END FILE---`) won't register.
+const OPENER_LINE = /^---\s*FILE:\s*(.+?)\s*---\s*$/i
+const CLOSER_LINE = /^---\s*END\s+FILE\s*---\s*$/i
+// Fence delimiters per CommonMark (triple+ backticks or tildes). Leading
+// indentation ≤ 3 spaces is still a fence; 4+ spaces is an indented code
+// block and doesn't use fence markers.
+const FENCE_LINE = /^\s{0,3}(```+|~~~+)/
+
+/**
+ * Parse an LLM stage-2 generation into FILE blocks.
+ *
+ * Known hazards the naive `---FILE:...---END FILE---` regex walks into
+ * (all reproduced as fixtures in src/lib/ingest-parse.test.ts):
+ *
+ *   H1. Windows CRLF line endings — regex anchored on bare `\n` missed
+ *       every block.
+ *   H2. Stream truncation — the last block's closing `---END FILE---`
+ *       never arrived; the entire block was silently dropped with no
+ *       logging.
+ *   H3. Marker whitespace / case variants — `--- END FILE ---`,
+ *       `---end file---`, `--- FILE: path ---`, `---FILE: foo--- \n`
+ *       (trailing space) all made the regex fail.
+ *   H5. Literal `---END FILE---` inside a fenced code block (e.g. when
+ *       the LLM is writing a concept page about our own ingest format)
+ *       — lazy match stopped at the first occurrence, truncating the
+ *       page and dumping all subsequent real content into no-man's-land.
+ *   H6. Empty path — block matched but was silently dropped by a
+ *       downstream `!path` check.
+ *
+ * This parser fixes every one except H2 (which is fundamentally a
+ * stream-budget problem), and at least surfaces H2 as a warning so the
+ * user isn't left wondering why a page is missing.
+ */
+export function parseFileBlocks(text: string): ParseFileBlocksResult {
+  // H1 fix: normalize CRLF to LF before anything else. Cheap and
+  // covers the case where a proxy / server / LLM inserts Windows line
+  // endings into the stream.
+  const normalized = text.replace(/\r\n/g, "\n")
+  const lines = normalized.split("\n")
+
+  const blocks: ParsedFileBlock[] = []
+  const warnings: string[] = []
+
+  let i = 0
+  while (i < lines.length) {
+    const openerMatch = OPENER_LINE.exec(lines[i])
+    if (!openerMatch) {
+      i++
+      continue
+    }
+    const path = openerMatch[1].trim()
+    i++ // consume opener
+
+    const contentLines: string[] = []
+    let fenceMarker: string | null = null // tracks whether we're inside ``` or ~~~
+    let fenceLen = 0
+    let closed = false
+
+    while (i < lines.length) {
+      const line = lines[i]
+
+      // H5 fix: update fence state before checking closer. Only close
+      // the fence when we see the same character repeated at least as
+      // many times — CommonMark rule. This lets docs-about-our-format
+      // quote `---END FILE---` inside code fences without truncating
+      // the outer block.
+      const fenceMatch = FENCE_LINE.exec(line)
+      if (fenceMatch) {
+        const run = fenceMatch[1]
+        const char = run[0] // '`' or '~'
+        const len = run.length
+        if (fenceMarker === null) {
+          fenceMarker = char
+          fenceLen = len
+        } else if (char === fenceMarker && len >= fenceLen) {
+          fenceMarker = null
+          fenceLen = 0
+        }
+        contentLines.push(line)
+        i++
+        continue
+      }
+
+      // A line matching the closer ONLY counts when we're outside any
+      // code fence. Inside a fence, treat it as ordinary body text.
+      if (fenceMarker === null && CLOSER_LINE.test(line)) {
+        closed = true
+        i++
+        break
+      }
+
+      contentLines.push(line)
+      i++
+    }
+
+    if (!closed) {
+      // H2 fix (partial): we can't fabricate content the LLM never
+      // sent, but we surface the drop instead of silently hiding it.
+      const pathLabel = path || "(unnamed)"
+      const msg = `FILE block "${pathLabel}" was not closed before end of stream — likely truncation (model hit max_tokens, timeout, or connection dropped). Block dropped.`
+      console.warn(`[ingest] ${msg}`)
+      warnings.push(msg)
+      continue
+    }
+
+    if (!path) {
+      // H6 fix: surface empty-path blocks.
+      const msg = `FILE block with empty path skipped (LLM omitted the path after \`---FILE:\`).`
+      console.warn(`[ingest] ${msg}`)
+      warnings.push(msg)
+      continue
+    }
+
+    blocks.push({ path, content: contentLines.join("\n") })
+  }
+
+  return { blocks, warnings }
+}
 
 /**
  * Build the language rule for ingest prompts.
@@ -154,7 +292,18 @@ export async function autoIngest(
 
   // ── Step 3: Write files ───────────────────────────────────────
   activity.updateItem(activityId, { detail: "Writing files..." })
-  const writtenPaths = await writeFileBlocks(pp, generation)
+  const { writtenPaths, warnings: writeWarnings } = await writeFileBlocks(pp, generation)
+
+  // Surface parser / writer warnings to the activity panel so users
+  // don't have to open devtools to find out a block was dropped.
+  // Keeping the base "Writing files..." detail on top and appending the
+  // first few warnings; full list stays in the console.
+  if (writeWarnings.length > 0) {
+    const summary = writeWarnings.length === 1
+      ? writeWarnings[0]
+      : `${writeWarnings.length} ingest warnings: ${writeWarnings.slice(0, 2).join(" · ")}${writeWarnings.length > 2 ? ` … (+${writeWarnings.length - 2} more in console)` : ""}`
+    activity.updateItem(activityId, { detail: summary })
+  }
 
   // Ensure source summary page exists (LLM may not have generated it correctly)
   const sourceBaseName = fileName.replace(/\.[^.]+$/, "")
@@ -281,17 +430,17 @@ function contentMatchesTargetLanguage(content: string, target: string): boolean 
   return !detectedIsCjk && !["Arabic", "Hindi", "Thai", "Hebrew"].includes(detected)
 }
 
-async function writeFileBlocks(projectPath: string, text: string): Promise<string[]> {
+async function writeFileBlocks(
+  projectPath: string,
+  text: string,
+): Promise<{ writtenPaths: string[]; warnings: string[] }> {
+  const { blocks, warnings: parseWarnings } = parseFileBlocks(text)
+  const warnings = [...parseWarnings]
   const writtenPaths: string[] = []
-  const matches = text.matchAll(FILE_BLOCK_REGEX)
 
   const targetLang = useWikiStore.getState().outputLanguage
 
-  for (const match of matches) {
-    const relativePath = match[1].trim()
-    const content = match[2]
-    if (!relativePath) continue
-
+  for (const { path: relativePath, content } of blocks) {
     // Language guard: reject individual FILE blocks whose body contradicts
     // the user-set target language. Skip:
     // - log.md (structural, short)
@@ -314,9 +463,9 @@ async function writeFileBlocks(projectPath: string, text: string): Promise<strin
       !isEntityOrSource &&
       !contentMatchesTargetLanguage(content, targetLang)
     ) {
-      console.warn(
-        `[ingest] dropping ${relativePath}: content not in target language ${targetLang}`,
-      )
+      const msg = `Dropped "${relativePath}" — body language doesn't match target ${targetLang}.`
+      console.warn(`[ingest] ${msg}`)
+      warnings.push(msg)
       continue
     }
 
@@ -331,11 +480,13 @@ async function writeFileBlocks(projectPath: string, text: string): Promise<strin
       }
       writtenPaths.push(relativePath)
     } catch (err) {
-      console.error(`Failed to write ${fullPath}:`, err)
+      const msg = `Failed to write "${relativePath}": ${err instanceof Error ? err.message : String(err)}`
+      console.error(`[ingest] ${msg}`)
+      warnings.push(msg)
     }
   }
 
-  return writtenPaths
+  return { writtenPaths, warnings }
 }
 
 const REVIEW_BLOCK_REGEX = /---REVIEW:\s*(\w[\w-]*)\s*\|\s*(.+?)\s*---\n([\s\S]*?)---END REVIEW---/g
