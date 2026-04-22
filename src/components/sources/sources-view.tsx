@@ -18,6 +18,8 @@ import {
   extractFrontmatterTitle,
   type DeletedPageInfo,
 } from "@/lib/wiki-cleanup"
+import { parseSources, writeSources } from "@/lib/sources-merge"
+import { decidePageFate } from "@/lib/source-delete-decision"
 
 export function SourcesView() {
   const { t } = useTranslation()
@@ -223,43 +225,46 @@ export function SourcesView() {
         // cache file may not exist
       }
 
-      // Step 4: Delete or update related wiki pages.
-      // - Multi-source pages: just remove this source from the `sources[]`
-      //   frontmatter list, keep the page on disk.
-      // - Single-source (or no-sources) pages: actually delete, and
-      //   capture { slug, title } so downstream cleanup can wipe every
-      //   stale reference — both the slug form (`[[kv-cache]]`) and the
-      //   title form (`[[KV Cache]]`) that the LLM emits interchangeably.
+      // Step 4: For each page that findRelatedWikiPages surfaced,
+      // consult decidePageFate to pick one of three actions:
+      //
+      //   keep   — page has OTHER sources too; just drop this one from
+      //            its sources[] list and rewrite.
+      //   delete — this was the page's sole source; remove the page
+      //            and record { slug, title } so downstream cleanup
+      //            can wipe every stale reference to it.
+      //   skip   — the page's sources[] doesn't actually include the
+      //            file being deleted. Must have been surfaced by the
+      //            Rust findRelatedWikiPages loose-match path (fs.rs
+      //            Strategy 3 — substring of title / description /
+      //            elsewhere in the frontmatter). Leaving the page
+      //            alone prevents silent data loss when a filename
+      //            happens to appear in an unrelated page's metadata.
       const actuallyDeleted: string[] = []
       const deletedInfos: DeletedPageInfo[] = []
       for (const pagePath of relatedPages) {
         try {
           const content = await readFile(pagePath)
-          // Parse sources from frontmatter
-          const sourcesMatch = content.match(/^sources:\s*\[([^\]]*)\]/m)
-          if (sourcesMatch) {
-            const sourcesList = sourcesMatch[1]
-              .split(",")
-              .map((s) => s.trim().replace(/["']/g, ""))
-              .filter((s) => s.length > 0)
+          const sourcesList = parseSources(content)
+          const decision = decidePageFate(sourcesList, fileName)
 
-            if (sourcesList.length > 1) {
-              // Multiple sources — just remove this file from the list, keep the page
-              const updatedSources = sourcesList.filter(
-                (s) => s.toLowerCase() !== fileName.toLowerCase()
-              )
-              const updatedContent = content.replace(
-                /^sources:\s*\[([^\]]*)\]/m,
-                `sources: [${updatedSources.map((s) => `"${s}"`).join(", ")}]`
-              )
-              await writeFile(pagePath, updatedContent)
-              continue // Don't delete this page
-            }
+          if (decision.action === "skip") {
+            // Nothing to do — page isn't really derived from this source.
+            continue
           }
 
-          // Single source or no sources field — delete the page and
-          // record both its slug and its frontmatter title so index /
-          // overview / other pages can be cleaned of stale references.
+          if (decision.action === "keep") {
+            // Multi-source page — rewrite sources with the deleted one
+            // filtered out. writeSources preserves every other
+            // frontmatter field and position.
+            const updated = writeSources(content, decision.updatedSources)
+            await writeFile(pagePath, updated)
+            continue
+          }
+
+          // action === "delete": the page's sole source was this file.
+          // Capture slug + title before deletion so stale references
+          // can be cleaned from index / overview / sibling pages.
           const slug = getFileName(pagePath).replace(/\.md$/, "")
           const title = extractFrontmatterTitle(content)
           deletedInfos.push({ slug, title })
