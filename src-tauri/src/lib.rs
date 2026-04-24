@@ -33,6 +33,10 @@ pub fn run() {
             if let Ok(dir) = app.path().resource_dir() {
                 commands::fs::set_resource_dir_hint(dir);
             }
+            // Registry of running `claude` subprocesses, keyed by the
+            // frontend-generated stream id. Populated by claude_cli_spawn,
+            // drained on process exit or by claude_cli_kill.
+            app.manage(commands::claude_cli::ClaudeCliState::default());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -59,6 +63,9 @@ pub fn run() {
             commands::vectorstore::vector_count_chunks,
             commands::vectorstore::vector_legacy_row_count,
             commands::vectorstore::vector_drop_legacy,
+            commands::claude_cli::claude_cli_detect,
+            commands::claude_cli::claude_cli_spawn,
+            commands::claude_cli::claude_cli_kill,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
