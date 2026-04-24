@@ -46,5 +46,9 @@ export default defineConfig(async () => ({
 
   test: {
     environment: "node",
+    // Loads .env.test.local into process.env for real-LLM tests.
+    // The loader itself is a no-op if the file is absent, so this is
+    // safe to keep on for every test run.
+    setupFiles: ["./src/test-helpers/load-test-env.ts"],
   },
 }))

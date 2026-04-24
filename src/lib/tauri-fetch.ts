@@ -20,6 +20,15 @@
 let pluginFetchPromise: Promise<typeof globalThis.fetch> | null = null
 
 /**
+ * True when running outside a browser / webview (vitest, SSR, any
+ * Node-based tooling). The Tauri plugin is importable in Node
+ * (resolution succeeds) but its internals reach for `window` at call
+ * time, so we must avoid invoking it — guard BEFORE the dynamic
+ * import rather than trying to .catch() an error that happens later.
+ */
+const isNodeEnv = typeof window === "undefined"
+
+/**
  * Returns a fetch function that routes through Tauri's HTTP plugin in
  * production, falling back to the platform's native fetch in non-Tauri
  * environments (tests / SSR / storybook). Call this once per request:
@@ -31,9 +40,14 @@ let pluginFetchPromise: Promise<typeof globalThis.fetch> | null = null
  */
 export function getHttpFetch(): Promise<typeof globalThis.fetch> {
   if (!pluginFetchPromise) {
-    pluginFetchPromise = import("@tauri-apps/plugin-http")
-      .then((m) => m.fetch as unknown as typeof globalThis.fetch)
-      .catch(() => globalThis.fetch)
+    if (isNodeEnv) {
+      // Bind so `this === globalThis` — Node's fetch requires it.
+      pluginFetchPromise = Promise.resolve(globalThis.fetch.bind(globalThis))
+    } else {
+      pluginFetchPromise = import("@tauri-apps/plugin-http")
+        .then((m) => m.fetch as unknown as typeof globalThis.fetch)
+        .catch(() => globalThis.fetch.bind(globalThis))
+    }
   }
   return pluginFetchPromise
 }

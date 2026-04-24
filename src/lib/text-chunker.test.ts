@@ -28,7 +28,9 @@ describe("stripFrontmatter", () => {
     const input = "---\ntitle: RoPE\ntype: concept\n---\nBody content"
     const { body, bodyOffset } = stripFrontmatter(input)
     expect(body).toBe("Body content")
-    expect(bodyOffset).toBeGreaterThan(0)
+    // Exact offset — the fence is 4 chars (`---\n`), the body 29 chars,
+    // the close fence 4 chars → body starts at index 33.
+    expect(bodyOffset).toBe("---\ntitle: RoPE\ntype: concept\n---\n".length)
     expect(input.slice(bodyOffset)).toBe("Body content")
   })
 
@@ -292,11 +294,24 @@ describe("chunkMarkdown — overlap between adjacent chunks", () => {
 
   it("clamps overlap to half the target when misconfigured", () => {
     // overlapChars >= targetChars would infinite-loop the packer; the
-    // chunker must silently clamp and still terminate.
+    // chunker must silently clamp to floor(targetChars/2) and still
+    // terminate. A plain `rep("a", N)` input has no sentence/whitespace
+    // separators, so snapOverlapHead returns the tail unchanged → we
+    // can measure the exact overlap by comparing chunk[1] length to
+    // chunk[1]'s original size (= targetChars from the hard-slice).
     const input = rep("a", 2000)
     const result = chunkMarkdown(input, { targetChars: 200, maxChars: 500, minChars: 20, overlapChars: 500 })
-    expect(result.length).toBeGreaterThan(0)
-    expect(result.length).toBeLessThan(100) // sanity: terminates quickly
+    // Hard-slice at 200 chars → 10 pieces.
+    expect(result).toHaveLength(10)
+    // chunk[0] is the first slice, untouched.
+    expect(result[0].text).toHaveLength(200)
+    // chunk[1..] = clamp(500 → 100) chars of prev + 200 chars of own →
+    // 300 chars. If the clamp silently regressed to e.g. `overlapChars`
+    // unclamped, `slice(-500)` on a 200-char prev yields 200 chars of
+    // overlap and the second chunk would be 400 chars, not 300.
+    for (let i = 1; i < result.length; i++) {
+      expect(result[i].text).toHaveLength(300)
+    }
   })
 })
 
@@ -447,7 +462,10 @@ describe("chunkMarkdown — realistic wiki fixture", () => {
 
   it("produces the expected number of chunks under default options", () => {
     const result = chunkMarkdown(wikiPage)
-    expect(result.length).toBeGreaterThan(0)
+    // Pin the exact count — regressions in chunking semantics (heading
+    // cuts, atom merging, overlap) all show up here. If the chunker is
+    // retuned intentionally, update this constant deliberately.
+    expect(result).toHaveLength(6)
   })
 
   it("each chunk is ≤ maxChars (or flagged oversized)", () => {
@@ -457,14 +475,22 @@ describe("chunkMarkdown — realistic wiki fixture", () => {
     }
   })
 
-  it("every chunk either has a heading path or is the pre-heading preamble", () => {
+  it("only the preamble chunk has empty headingPath; every heading-scoped chunk has one", () => {
     const result = chunkMarkdown(wikiPage)
-    for (const c of result) {
-      // Non-empty content should be discoverable under some heading,
-      // except for preamble (before any `#`) which legitimately has "".
-      if (!c.text.startsWith("Rotary")) {
-        expect(c.headingPath.length).toBeGreaterThan(0)
-      }
+    // Find the preamble chunk structurally (the one containing the
+    // first body paragraph that sits under the H1) — NOT by text
+    // prefix, so this test doesn't silently skip when chunks reorder.
+    const preamble = result.find((c) => c.text.includes("Rotary positional embeddings(RoPE)"))
+    expect(preamble).toBeDefined()
+    expect(preamble!.headingPath).toBe("# RoPE 旋转位置编码")
+
+    // Every OTHER chunk must have a heading path. Without the explicit
+    // split we used to silently skip the assertion when chunk ordering
+    // drifted.
+    const nonPreamble = result.filter((c) => c !== preamble)
+    expect(nonPreamble.length).toBeGreaterThanOrEqual(1)
+    for (const c of nonPreamble) {
+      expect(c.headingPath.length).toBeGreaterThan(0)
     }
   })
 
@@ -472,8 +498,12 @@ describe("chunkMarkdown — realistic wiki fixture", () => {
     const result = chunkMarkdown(wikiPage)
     const codeChunk = result.find((c) => c.text.includes("theta_i = base"))
     expect(codeChunk).toBeDefined()
-    const openers = codeChunk!.text.match(/```/g)?.length ?? 0
-    expect(openers % 2).toBe(0)
+    // Must contain BOTH an opener and a closer (exactly 2 ``` markers),
+    // not just an even count — `0 % 2 === 0` passes trivially and would
+    // green an "opener escaped, closer stayed behind" regression.
+    const fenceMarkers = codeChunk!.text.match(/```/g) ?? []
+    expect(fenceMarkers).toHaveLength(2)
+    expect(codeChunk!.text).toContain("q' = q * e^(j * m * theta)")
   })
 
   it("list items about variants are captured", () => {
@@ -482,6 +512,83 @@ describe("chunkMarkdown — realistic wiki fixture", () => {
     expect(joined).toContain("xPos")
     expect(joined).toContain("LongRoPE")
     expect(joined).toContain("YaRN")
+  })
+})
+
+// ── CRLF content body (Windows line endings) ───────────────────────
+
+describe("chunkMarkdown — CRLF in body", () => {
+  it("handles CRLF-delimited headings and fences correctly", () => {
+    // A Windows-authored markdown file uses \r\n, not \n. The chunker
+    // splits on \n and leaves \r attached to each line; the fence
+    // regex uses startsWith + trim() so \r shouldn't break fence
+    // detection. Headings use `\s+` which eats \r. If either regex
+    // regressed, the fence wouldn't close (everything becomes one
+    // oversized chunk) OR the heading wouldn't register (headingPath
+    // empty).
+    const input = "# Head\r\n\r\n```py\r\ncode line 1\r\ncode line 2\r\n```\r\n\r\nafter\r\n"
+    const result = chunkMarkdown(input, { targetChars: 2000 })
+    expect(result).toHaveLength(1)
+    expect(result[0].headingPath).toBe("# Head")
+    expect(result[0].text).toContain("code line 1")
+    expect(result[0].text).toContain("after")
+    expect(result[0].oversized).toBe(false)
+  })
+})
+
+// ── Nested fences (4-tick wrapping 3-tick) ─────────────────────────
+
+describe("chunkMarkdown — nested fences", () => {
+  it("a 4-backtick fence keeps a 3-backtick inner block intact", () => {
+    // CommonMark says a fence can only be closed by a run of the same
+    // character with length ≥ the opening run. So ```` should NOT be
+    // closed by ``` inside. The chunker records the opening marker's
+    // full length and must require the closer to match it exactly.
+    const input = [
+      "Intro.",
+      "",
+      "````markdown",
+      "Here is some embedded markdown with its own fence:",
+      "```python",
+      "print('inner')",
+      "```",
+      "End of embedded markdown.",
+      "````",
+      "",
+      "Outro.",
+    ].join("\n")
+    const result = chunkMarkdown(input, { targetChars: 2000 })
+    expect(result).toHaveLength(1)
+    // Inner ``` fence must remain captured inside the chunk — not
+    // treated as a closer that terminated the outer fence early.
+    expect(result[0].text).toContain("print('inner')")
+    expect(result[0].text).toContain("End of embedded markdown.")
+    expect(result[0].text).toContain("Outro.")
+  })
+})
+
+// ── Tables without a separator row ─────────────────────────────────
+
+describe("chunkMarkdown — table with no |---|---| separator", () => {
+  it("treats 2+ consecutive leading-pipe lines as a single indivisible table atom", () => {
+    // Some wikis omit the separator row (rendered as a two-row data
+    // table by many markdown engines). The chunker's rule is purely
+    // structural: ≥2 consecutive `|`-prefixed lines = one table atom.
+    const input = [
+      "Intro.",
+      "",
+      "| key1 | val1 |",
+      "| key2 | val2 |",
+      "",
+      "Outro.",
+    ].join("\n")
+    // Use targetChars small enough that a torn table WOULD produce
+    // multiple chunks — so we can assert "stayed intact" meaningfully.
+    const result = chunkMarkdown(input, { targetChars: 20, maxChars: 200, minChars: 5, overlapChars: 0 })
+    const tableChunks = result.filter((c) => c.text.includes("| key1"))
+    expect(tableChunks).toHaveLength(1)
+    expect(tableChunks[0].text).toContain("| key1 | val1 |")
+    expect(tableChunks[0].text).toContain("| key2 | val2 |")
   })
 })
 

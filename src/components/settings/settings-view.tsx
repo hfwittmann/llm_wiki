@@ -67,6 +67,8 @@ function initialDraft(
     embeddingEndpoint: embed.endpoint,
     embeddingApiKey: embed.apiKey,
     embeddingModel: embed.model,
+    embeddingMaxChunkChars: embed.maxChunkChars,
+    embeddingOverlapChunkChars: embed.overlapChunkChars,
     searchProvider: search.provider,
     searchApiKey: search.apiKey,
     outputLanguage,
@@ -148,6 +150,8 @@ export function SettingsView() {
       endpoint: draft.embeddingEndpoint,
       apiKey: draft.embeddingApiKey,
       model: draft.embeddingModel,
+      maxChunkChars: draft.embeddingMaxChunkChars,
+      overlapChunkChars: draft.embeddingOverlapChunkChars,
     }
 
     setLlmConfig(newLlm)

@@ -52,7 +52,7 @@ export function getLastEmbeddingError(): string | null {
  * positive just means a retry at half size, which will still succeed
  * on a real auth/model-id error (it won't) or just log the same error.
  */
-function looksLikeOversizeError(httpStatus: number, body: string): boolean {
+export function looksLikeOversizeError(httpStatus: number, body: string): boolean {
   if (httpStatus === 413) return true
   const lower = body.toLowerCase()
   return (
@@ -77,7 +77,7 @@ function looksLikeOversizeError(httpStatus: number, body: string): boolean {
  * actually got through. Chunker config should be tuned to minimise
  * truncation — this is a safety net, not the main line of defence.
  */
-async function fetchEmbedding(
+export async function fetchEmbedding(
   text: string,
   cfg: EmbeddingConfig,
   maxRetries = 3,

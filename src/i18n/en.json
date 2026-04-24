@@ -129,7 +129,22 @@
         "endpoint": "Endpoint",
         "apiKey": "API Key (optional)",
         "apiKeyPlaceholder": "Leave empty for local models",
-        "model": "Model"
+        "model": "Model",
+        "chunking": "Chunking",
+        "maxChunkChars": "Max chunk size (characters)",
+        "maxChunkCharsHint": "Target size of each chunk. Lower this (e.g. 500) when your endpoint's context is small (llama.cpp n_ctx=512, mxbai-embed-large, etc.).",
+        "overlapChunkChars": "Overlap (characters)",
+        "overlapChunkCharsHint": "Characters of overlap between adjacent chunks so ideas aren't severed at boundaries.",
+        "statsHeading": "Index status",
+        "chunkCount": "{{count}} chunks indexed",
+        "lastErrorHeading": "Last embedding error",
+        "reindexAll": "Re-index all pages",
+        "reindexing": "Indexing {{done}}/{{total}}…",
+        "reindexDone": "Indexed {{count}} pages.",
+        "legacyPromptTitle": "Legacy per-page index detected",
+        "legacyPromptBody": "Your project has {{count}} entries in the old per-page vector store. The new per-chunk index gives better retrieval but needs a one-time re-embed. Run \"Re-index all pages\" to upgrade.",
+        "dropLegacy": "Drop legacy index",
+        "dropLegacyDone": "Legacy index removed."
       },
       "webSearch": {
         "title": "Web Search",

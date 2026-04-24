@@ -21,6 +21,10 @@ export interface SettingsDraft {
   embeddingEndpoint: string
   embeddingApiKey: string
   embeddingModel: string
+  /** Target characters per chunk. Empty = use chunker default (1000). */
+  embeddingMaxChunkChars: number | undefined
+  /** Overlap characters between adjacent chunks. Empty = default (200). */
+  embeddingOverlapChunkChars: number | undefined
 
   // Web search
   searchProvider: "tavily" | "none"

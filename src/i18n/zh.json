@@ -129,7 +129,22 @@
         "endpoint": "Endpoint",
         "apiKey": "API Key（可选）",
         "apiKeyPlaceholder": "本地模型留空即可",
-        "model": "Model"
+        "model": "Model",
+        "chunking": "切分参数",
+        "maxChunkChars": "每块最大字符数",
+        "maxChunkCharsHint": "单个 chunk 的目标长度。endpoint 上下文较小时（llama.cpp n_ctx=512、mxbai-embed-large 等）调低（如 500）。",
+        "overlapChunkChars": "重叠字符数",
+        "overlapChunkCharsHint": "相邻 chunk 之间的重叠字符数，避免语义在边界被切断。",
+        "statsHeading": "索引状态",
+        "chunkCount": "已索引 {{count}} 个 chunk",
+        "lastErrorHeading": "上次 embedding 错误",
+        "reindexAll": "重新索引全部页面",
+        "reindexing": "索引中 {{done}}/{{total}}…",
+        "reindexDone": "已索引 {{count}} 个页面。",
+        "legacyPromptTitle": "检测到旧版（按页）索引",
+        "legacyPromptBody": "当前项目在旧版按页向量存储里有 {{count}} 条记录。新版按 chunk 索引检索质量更高,但需要一次性重新 embed。点击\"重新索引全部页面\"完成升级。",
+        "dropLegacy": "删除旧版索引",
+        "dropLegacyDone": "旧版索引已删除。"
       },
       "webSearch": {
         "title": "网页搜索",

@@ -8,8 +8,9 @@
     "typecheck": "tsc --build --pretty",
     "build": "npm run typecheck && vite build",
     "preview": "vite preview",
-    "test": "vitest run --exclude='**/*.real-llm.test.ts'",
-    "test:llm": "RUN_LLM_TESTS=1 vitest run real-llm --no-file-parallelism --reporter=verbose",
+    "test": "npm run test:mocks && npm run test:llm",
+    "test:mocks": "vitest run --exclude='**/*.real-llm.test.ts'",
+    "test:llm": "vitest run real-llm --no-file-parallelism --reporter=verbose",
     "tauri": "tauri"
   },
   "dependencies": {
