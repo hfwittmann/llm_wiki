@@ -53,6 +53,12 @@ pub fn run() {
             commands::vectorstore::vector_search,
             commands::vectorstore::vector_delete,
             commands::vectorstore::vector_count,
+            commands::vectorstore::vector_upsert_chunks,
+            commands::vectorstore::vector_search_chunks,
+            commands::vectorstore::vector_delete_page,
+            commands::vectorstore::vector_count_chunks,
+            commands::vectorstore::vector_legacy_row_count,
+            commands::vectorstore::vector_drop_legacy,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
