@@ -80,6 +80,33 @@ function generateId(): string {
 }
 
 /**
+ * Delete files written by a cancelled / failed ingest, AND drop the
+ * matching pages' chunks from LanceDB. Called from the cancel paths
+ * (cancelTask, cancelAllTasks).
+ *
+ * Per-file errors are swallowed (best-effort cleanup) — a missing
+ * file or LanceDB unavailable shouldn't abort the cancel flow.
+ * Structural pages (index/log/overview) aren't embedded, so the
+ * cascade no-ops for them.
+ */
+export async function cleanupWrittenFiles(
+  projectPath: string,
+  filePaths: string[],
+): Promise<void> {
+  const { cascadeDeleteWikiPage } = await import("@/lib/wiki-page-delete")
+  for (const filePath of filePaths) {
+    const fullPath = isAbsolutePath(filePath)
+      ? normalizePath(filePath)
+      : `${projectPath}/${filePath}`
+    try {
+      await cascadeDeleteWikiPage(projectPath, fullPath)
+    } catch {
+      // file may not exist / lancedb unavailable — non-critical
+    }
+  }
+}
+
+/**
  * Add a file to the ingest queue. The project MUST be the currently-
  * active project — switching first is a prerequisite. Returns the new
  * task's id.
@@ -184,17 +211,7 @@ export async function cancelTask(taskId: string): Promise<void> {
 
     // Clean up any files written by the interrupted ingest
     if (lastWrittenFiles.length > 0) {
-      const { deleteFile } = await import("@/commands/fs")
-      for (const filePath of lastWrittenFiles) {
-        try {
-          const fullPath = isAbsolutePath(filePath)
-            ? normalizePath(filePath)
-            : `${currentProjectPath}/${filePath}`
-          await deleteFile(fullPath)
-        } catch {
-          // file may not exist
-        }
-      }
+      await cleanupWrittenFiles(currentProjectPath, lastWrittenFiles)
       console.log(`[Ingest Queue] Cleaned up ${lastWrittenFiles.length} files from cancelled task`)
       lastWrittenFiles = []
     }
@@ -233,17 +250,7 @@ export async function cancelAllTasks(): Promise<number> {
   processing = false
 
   if (lastWrittenFiles.length > 0) {
-    const { deleteFile } = await import("@/commands/fs")
-    for (const filePath of lastWrittenFiles) {
-      try {
-        const fullPath = isAbsolutePath(filePath)
-          ? normalizePath(filePath)
-          : `${currentProjectPath}/${filePath}`
-        await deleteFile(fullPath)
-      } catch {
-        // file may not exist
-      }
-    }
+    await cleanupWrittenFiles(currentProjectPath, lastWrittenFiles)
     lastWrittenFiles = []
   }
 

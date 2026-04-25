@@ -20,6 +20,18 @@ vi.mock("./sweep-reviews", () => ({
   sweepResolvedReviews: vi.fn().mockResolvedValue(0),
 }))
 
+// Mock embedding so cleanupWrittenFiles' cascade-delete to LanceDB is
+// observable. The real module is over in `./embedding` but
+// cleanupWrittenFiles dynamically imports it via `@/lib/embedding`,
+// hence the absolute mock target.
+const removePageEmbeddingMock = vi.fn<(projectPath: string, slug: string) => Promise<void>>(
+  async () => {},
+)
+vi.mock("@/lib/embedding", () => ({
+  removePageEmbedding: (projectPath: string, slug: string) =>
+    removePageEmbeddingMock(projectPath, slug),
+}))
+
 // Mock project-identity — tests don't hit Tauri plugin-store. Maps the
 // test UUIDs defined below back to their assigned paths.
 const TEST_ID = "test-project-uuid"
@@ -46,6 +58,7 @@ import {
   cancelAllTasks,
   clearCompletedTasks,
   clearQueueState,
+  cleanupWrittenFiles,
   getQueue,
   getQueueSummary,
   restoreQueue,
@@ -75,6 +88,7 @@ beforeEach(async () => {
   mockWriteFile.mockReset()
   mockSweep.mockReset()
   mockSweep.mockResolvedValue(0)
+  removePageEmbeddingMock.mockReset()
 
   // Default: persisted queue file doesn't exist
   mockReadFile.mockRejectedValue(new Error("ENOENT"))
@@ -517,5 +531,101 @@ describe("ingest-queue — pauseQueue & switch-project survival", () => {
       const parsed = JSON.parse(String(content))
       expect(parsed).toEqual([])
     }
+  })
+})
+
+// ── cleanupWrittenFiles — file delete + LanceDB chunk cascade ──────
+describe("cleanupWrittenFiles — embedding cascade", () => {
+  it("deletes each file AND drops its embedding chunks (relative paths)", async () => {
+    const { deleteFile } = await import("@/commands/fs")
+    const mockDeleteFile = vi.mocked(deleteFile)
+    mockDeleteFile.mockReset()
+    mockDeleteFile.mockResolvedValue(undefined)
+
+    await cleanupWrittenFiles("/proj", [
+      "wiki/concepts/rope.md",
+      "wiki/entities/transformer.md",
+    ])
+
+    // File deletes use joined absolute paths.
+    expect(mockDeleteFile).toHaveBeenCalledTimes(2)
+    expect(mockDeleteFile).toHaveBeenNthCalledWith(1, "/proj/wiki/concepts/rope.md")
+    expect(mockDeleteFile).toHaveBeenNthCalledWith(2, "/proj/wiki/entities/transformer.md")
+
+    // Embedding cascade uses page slugs (basename minus .md).
+    expect(removePageEmbeddingMock).toHaveBeenCalledTimes(2)
+    expect(removePageEmbeddingMock).toHaveBeenNthCalledWith(1, "/proj", "rope")
+    expect(removePageEmbeddingMock).toHaveBeenNthCalledWith(2, "/proj", "transformer")
+  })
+
+  it("uses absolute paths verbatim (doesn't double-prefix the project path)", async () => {
+    const { deleteFile } = await import("@/commands/fs")
+    const mockDeleteFile = vi.mocked(deleteFile)
+    mockDeleteFile.mockReset()
+    mockDeleteFile.mockResolvedValue(undefined)
+
+    await cleanupWrittenFiles("/proj", ["/abs/elsewhere/wiki/concepts/foo.md"])
+
+    expect(mockDeleteFile).toHaveBeenCalledWith("/abs/elsewhere/wiki/concepts/foo.md")
+    // Slug derivation still works on absolute paths.
+    expect(removePageEmbeddingMock).toHaveBeenCalledWith("/proj", "foo")
+  })
+
+  it("continues to subsequent files when one delete throws", async () => {
+    const { deleteFile } = await import("@/commands/fs")
+    const mockDeleteFile = vi.mocked(deleteFile)
+    mockDeleteFile.mockReset()
+    // First file fails (e.g. already gone), second succeeds.
+    mockDeleteFile
+      .mockRejectedValueOnce(new Error("ENOENT"))
+      .mockResolvedValueOnce(undefined)
+
+    await cleanupWrittenFiles("/proj", [
+      "wiki/concepts/missing.md",
+      "wiki/concepts/present.md",
+    ])
+
+    // Both deleteFile attempts happened — the helper kept going.
+    expect(mockDeleteFile).toHaveBeenCalledTimes(2)
+    // First file's embedding cascade was skipped (deleteFile threw),
+    // second file's cascade still ran.
+    expect(removePageEmbeddingMock).toHaveBeenCalledTimes(1)
+    expect(removePageEmbeddingMock).toHaveBeenCalledWith("/proj", "present")
+  })
+
+  it("swallows removePageEmbedding errors so a LanceDB issue doesn't abort cleanup", async () => {
+    const { deleteFile } = await import("@/commands/fs")
+    const mockDeleteFile = vi.mocked(deleteFile)
+    mockDeleteFile.mockReset()
+    mockDeleteFile.mockResolvedValue(undefined)
+
+    // First page's embedding cascade throws; second succeeds.
+    removePageEmbeddingMock
+      .mockRejectedValueOnce(new Error("lancedb unavailable"))
+      .mockResolvedValueOnce(undefined)
+
+    await cleanupWrittenFiles("/proj", [
+      "wiki/concepts/a.md",
+      "wiki/concepts/b.md",
+    ])
+
+    // Both file deletes still happened.
+    expect(mockDeleteFile).toHaveBeenCalledTimes(2)
+    // Second cascade still attempted despite first throwing.
+    expect(removePageEmbeddingMock).toHaveBeenCalledTimes(2)
+  })
+
+  it("handles Windows backslash paths via getFileStem", async () => {
+    const { deleteFile } = await import("@/commands/fs")
+    const mockDeleteFile = vi.mocked(deleteFile)
+    mockDeleteFile.mockReset()
+    mockDeleteFile.mockResolvedValue(undefined)
+
+    // A path that's been rewritten with backslashes (Windows ingest
+    // pipeline output before normalize). getFileStem must still
+    // pull "rope" out cleanly so the cascade hits the right page.
+    await cleanupWrittenFiles("C:/proj", ["wiki\\concepts\\rope.md"])
+
+    expect(removePageEmbeddingMock).toHaveBeenCalledWith("C:/proj", "rope")
   })
 })

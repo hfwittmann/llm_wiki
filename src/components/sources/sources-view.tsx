@@ -268,7 +268,11 @@ export function SourcesView() {
           const slug = getFileName(pagePath).replace(/\.md$/, "")
           const title = extractFrontmatterTitle(content)
           deletedInfos.push({ slug, title })
-          await deleteFile(pagePath)
+          // cascadeDeleteWikiPage = deleteFile(...) + drop the page's
+          // embedding chunks so future searches don't return phantom
+          // hits pointing at a file that no longer exists.
+          const { cascadeDeleteWikiPage } = await import("@/lib/wiki-page-delete")
+          await cascadeDeleteWikiPage(pp, pagePath)
           actuallyDeleted.push(pagePath)
         } catch (err) {
           console.error(`Failed to process wiki page ${pagePath}:`, err)
