@@ -279,25 +279,32 @@ async function autoIngestImpl(
 
   // ── Step 0.5: Extract embedded images ─────────────────────────
   // Pulls every embedded image out of PDF / PPTX / DOCX into
-  // `wiki/media/<source-slug>/`, returns metadata. Markdown image
-  // references get appended to the source content the LLM sees, so
-  // generated wiki pages can reference figures by page number even
-  // though we don't have captions yet (Phase 3a). Failure here is
-  // never fatal — extractAndSaveSourceImages logs + returns [] on
-  // any error.
+  // `wiki/media/<source-slug>/`. We DON'T inject the markdown
+  // references into sourceContent here — without VLM captions
+  // (Phase 3a) the alt text is empty, which gives the LLM no
+  // semantic signal to preserve them. The LLM tends to silently
+  // strip empty-alt images when summarizing.
+  //
+  // Instead, the markdown section is appended to the source-summary
+  // page on disk AFTER writeFileBlocks (see Step 5b below). That
+  // guarantees images appear in `wiki/sources/<slug>.md` regardless
+  // of LLM behavior. Once Phase 3a lands, we'll re-introduce the
+  // sourceContent injection because the captioned alt-text gives
+  // the LLM something meaningful to work with.
+  //
+  // Failure here is never fatal — extractAndSaveSourceImages logs
+  // and returns [] on any error.
   activity.updateItem(activityId, { detail: "Extracting embedded images..." })
   const savedImages = await extractAndSaveSourceImages(pp, sp)
-  const imageSection = buildImageMarkdownSection(savedImages)
-  const enrichedSourceContent = sourceContent + imageSection
   if (savedImages.length > 0) {
     console.log(
       `[ingest:images] saved ${savedImages.length} image(s) for "${fileName}" → wiki/media/${fileName.replace(/\.[^.]+$/, "")}/`,
     )
   }
 
-  const truncatedContent = enrichedSourceContent.length > 50000
-    ? enrichedSourceContent.slice(0, 50000) + "\n\n[...truncated...]"
-    : enrichedSourceContent
+  const truncatedContent = sourceContent.length > 50000
+    ? sourceContent.slice(0, 50000) + "\n\n[...truncated...]"
+    : sourceContent
 
   // ── Step 1: Analysis ──────────────────────────────────────────
   // LLM reads the source and produces a structured analysis:
@@ -432,6 +439,44 @@ async function autoIngestImpl(
       writtenPaths.push(sourceSummaryPath)
     } catch {
       // non-critical
+    }
+  }
+
+  // ── Step 3.5: Append extracted images to the source-summary page ─
+  // Reliable image surfacing: regardless of whether the LLM kept any
+  // image references in its generated content, we directly append a
+  // "## Embedded Images" section to wiki/sources/<slug>.md with the
+  // saved image paths. The custom <img> resolver in the markdown
+  // preview takes care of rendering them.
+  //
+  // Idempotent: if a previous ingest already appended this section,
+  // we replace it rather than duplicating. The marker comment
+  // <!-- llm-wiki:embedded-images --> identifies our injection.
+  if (savedImages.length > 0 && !signal?.aborted) {
+    try {
+      const existing = await tryReadFile(sourceSummaryFullPath)
+      if (existing) {
+        const newSection = buildImageMarkdownSection(savedImages)
+        const marker = "<!-- llm-wiki:embedded-images -->"
+        // Wrap the section in marker comments for idempotent
+        // replacement on re-ingest.
+        const wrapped = `\n\n${marker}\n${newSection.trim()}\n${marker}\n`
+        // Strip any prior injection (paired markers) so re-ingest
+        // doesn't accumulate stale references when images change.
+        const stripped = existing.replace(
+          new RegExp(`\\n*${marker}[\\s\\S]*?${marker}\\n*`, "g"),
+          "",
+        )
+        await writeFile(sourceSummaryFullPath, stripped.trimEnd() + wrapped)
+        console.log(
+          `[ingest:images] injected ${savedImages.length} image reference(s) into ${sourceSummaryPath}`,
+        )
+      }
+    } catch (err) {
+      console.warn(
+        `[ingest:images] failed to append images to ${sourceSummaryPath}:`,
+        err instanceof Error ? err.message : err,
+      )
     }
   }
 

@@ -19,7 +19,7 @@ const MEDIA_EXTS: &[&str] = &[
 const LEGACY_DOC_EXTS: &[&str] = &["doc", "xls", "ppt", "pages", "numbers", "key", "epub"];
 
 #[tauri::command]
-pub fn read_file(path: String) -> Result<String, String> {
+pub async fn read_file(path: String) -> Result<String, String> {
     run_guarded("read_file", || {
         let p = Path::new(&path);
         let ext = p
@@ -81,7 +81,7 @@ pub fn read_file(path: String) -> Result<String, String> {
 
 /// Pre-process a file and cache the extracted text.
 #[tauri::command]
-pub fn preprocess_file(path: String) -> Result<String, String> {
+pub async fn preprocess_file(path: String) -> Result<String, String> {
     run_guarded("preprocess_file", || {
         let p = Path::new(&path);
         let ext = p
@@ -819,7 +819,7 @@ fn extract_odf_text(archive: &mut zip::ZipArchive<fs::File>) -> Result<String, S
 }
 
 #[tauri::command]
-pub fn write_file(path: String, contents: String) -> Result<(), String> {
+pub async fn write_file(path: String, contents: String) -> Result<(), String> {
     run_guarded("write_file", || {
         let p = Path::new(&path);
         if let Some(parent) = p.parent() {
@@ -832,7 +832,7 @@ pub fn write_file(path: String, contents: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn list_directory(path: String) -> Result<Vec<FileNode>, String> {
+pub async fn list_directory(path: String) -> Result<Vec<FileNode>, String> {
     run_guarded("list_directory", || {
         let p = Path::new(&path);
         if !p.exists() {
@@ -914,7 +914,7 @@ fn build_tree(dir: &Path, depth: usize, max_depth: usize) -> Result<Vec<FileNode
 }
 
 #[tauri::command]
-pub fn copy_file(source: String, destination: String) -> Result<(), String> {
+pub async fn copy_file(source: String, destination: String) -> Result<(), String> {
     run_guarded("copy_file", || {
         let dest = Path::new(&destination);
         if let Some(parent) = dest.parent() {
@@ -930,7 +930,7 @@ pub fn copy_file(source: String, destination: String) -> Result<(), String> {
 /// Recursively copy a directory, preserving structure.
 /// Returns list of copied file paths (destination paths).
 #[tauri::command]
-pub fn copy_directory(source: String, destination: String) -> Result<Vec<String>, String> {
+pub async fn copy_directory(source: String, destination: String) -> Result<Vec<String>, String> {
     run_guarded("copy_directory", || {
         let src = Path::new(&source);
         let dest = Path::new(&destination);
@@ -983,7 +983,7 @@ pub fn copy_directory(source: String, destination: String) -> Result<Vec<String>
 }
 
 #[tauri::command]
-pub fn delete_file(path: String) -> Result<(), String> {
+pub async fn delete_file(path: String) -> Result<(), String> {
     run_guarded("delete_file", || {
         let p = Path::new(&path);
         if p.is_dir() {
@@ -999,7 +999,7 @@ pub fn delete_file(path: String) -> Result<(), String> {
 /// Find wiki pages that reference a given source file name.
 /// Scans all .md files under wiki/ for the source filename in frontmatter or content.
 #[tauri::command]
-pub fn find_related_wiki_pages(project_path: String, source_name: String) -> Result<Vec<String>, String> {
+pub async fn find_related_wiki_pages(project_path: String, source_name: String) -> Result<Vec<String>, String> {
     run_guarded("find_related_wiki_pages", || {
         let wiki_dir = Path::new(&project_path).join("wiki");
         if !wiki_dir.is_dir() {
@@ -1128,7 +1128,7 @@ fn collect_related_pages(dir: &Path, source_name: &str, results: &mut Vec<String
 }
 
 #[tauri::command]
-pub fn create_directory(path: String) -> Result<(), String> {
+pub async fn create_directory(path: String) -> Result<(), String> {
     run_guarded("create_directory", || {
         fs::create_dir_all(&path)
             .map_err(|e| format!("Failed to create directory '{}': {}", path, e))
@@ -1138,7 +1138,7 @@ pub fn create_directory(path: String) -> Result<(), String> {
 /// Cheap existence check without reading or classifying the file.
 /// Returns true iff `path` refers to something on disk right now.
 #[tauri::command]
-pub fn file_exists(path: String) -> Result<bool, String> {
+pub async fn file_exists(path: String) -> Result<bool, String> {
     run_guarded("file_exists", || Ok(Path::new(&path).exists()))
 }
 

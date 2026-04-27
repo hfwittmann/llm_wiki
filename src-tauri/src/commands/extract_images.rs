@@ -640,21 +640,21 @@ pub fn extract_and_save_office_images(
 // ── Tauri command bindings ─────────────────────────────────────────────
 
 #[tauri::command]
-pub fn extract_pdf_images_cmd(path: String) -> Result<Vec<ExtractedImage>, String> {
+pub async fn extract_pdf_images_cmd(path: String) -> Result<Vec<ExtractedImage>, String> {
     crate::panic_guard::run_guarded("extract_pdf_images", || {
         extract_pdf_images(&path, &ExtractOptions::default())
     })
 }
 
 #[tauri::command]
-pub fn extract_office_images_cmd(path: String) -> Result<Vec<ExtractedImage>, String> {
+pub async fn extract_office_images_cmd(path: String) -> Result<Vec<ExtractedImage>, String> {
     crate::panic_guard::run_guarded("extract_office_images", || {
         extract_office_images(&path, &ExtractOptions::default())
     })
 }
 
 #[tauri::command]
-pub fn extract_and_save_pdf_images_cmd(
+pub async fn extract_and_save_pdf_images_cmd(
     source_path: String,
     dest_dir: String,
     rel_to: String,
@@ -670,7 +670,7 @@ pub fn extract_and_save_pdf_images_cmd(
 }
 
 #[tauri::command]
-pub fn extract_and_save_office_images_cmd(
+pub async fn extract_and_save_office_images_cmd(
     source_path: String,
     dest_dir: String,
     rel_to: String,
