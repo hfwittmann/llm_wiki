@@ -7,7 +7,6 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { useWikiStore } from "@/stores/wiki-store"
 import { copyFile, listDirectory, readFile, writeFile, deleteFile, findRelatedWikiPages, preprocessFile } from "@/commands/fs"
 import type { FileNode } from "@/types/wiki"
-import { startIngest } from "@/lib/ingest"
 import { enqueueIngest, enqueueBatch } from "@/lib/ingest-queue"
 import { useTranslation } from "react-i18next"
 import { normalizePath, getFileName } from "@/lib/path-utils"
@@ -26,10 +25,8 @@ export function SourcesView() {
   const project = useWikiStore((s) => s.project)
   const selectedFile = useWikiStore((s) => s.selectedFile)
   const setSelectedFile = useWikiStore((s) => s.setSelectedFile)
-  const setActiveView = useWikiStore((s) => s.setActiveView)
   const setFileContent = useWikiStore((s) => s.setFileContent)
   const setFileTree = useWikiStore((s) => s.setFileTree)
-  const setChatExpanded = useWikiStore((s) => s.setChatExpanded)
   const llmConfig = useWikiStore((s) => s.llmConfig)
   const [sources, setSources] = useState<FileNode[]>([])
   const [importing, setImporting] = useState(false)
@@ -351,13 +348,18 @@ export function SourcesView() {
 
   async function handleIngest(node: FileNode) {
     if (!project || ingestingPath) return
+    // Re-ingest goes through the same automated queue path as a fresh
+    // import (`handleImport` above). Earlier this used `startIngest`,
+    // which opens an interactive chat → user clicks "Save to Wiki" →
+    // `executeIngestWrites`. That had two problems: (a) it duplicated
+    // the auto-pipeline so features like image cascade had to be
+    // wired in twice, and (b) the interactive flow surprised users
+    // who expected a fresh-import re-run. One button, one path now.
     setIngestingPath(node.path)
     try {
-      setChatExpanded(true)
-      setActiveView("wiki")
-      await startIngest(normalizePath(project.path), node.path, llmConfig)
+      await enqueueIngest(project.id, node.path)
     } catch (err) {
-      console.error("Failed to start ingest:", err)
+      console.error("Failed to enqueue ingest:", err)
     } finally {
       setIngestingPath(null)
     }

@@ -76,10 +76,13 @@ export async function extractAndSaveSourceImages(
       isPdf ? "extract_and_save_pdf_images_cmd" : "extract_and_save_office_images_cmd",
       { sourcePath: sp, destDir, relTo },
     )
-    // Rust serializes with snake_case-ish field names per the struct
-    // shape. Tauri's IPC layer with serde converts to camelCase
-    // automatically. Validate the shape defensively in case the
-    // contract drifts.
+    // Rust's `SavedImage` is `#[serde(rename_all = "camelCase")]`,
+    // so the wire format uses `relPath` / `absPath` / `mimeType`.
+    // (Note: Tauri's IPC auto-camelCase applies only to command
+    // PARAMETER names, never to return-value field names — without
+    // the explicit serde attribute on the Rust struct, this filter
+    // would drop every item and return `[]` even when extraction
+    // wrote images to disk. We had that bug.)
     return images
       .filter((it): it is SavedImage => {
         if (!it || typeof it !== "object") return false
@@ -116,7 +119,10 @@ export async function extractAndSaveSourceImages(
  * inline at page breaks; that requires the text extractor to emit
  * page boundaries, which it doesn't yet.
  */
-export function buildImageMarkdownSection(images: SavedImage[]): string {
+export function buildImageMarkdownSection(
+  images: SavedImage[],
+  captionsBySha?: Map<string, string>,
+): string {
   if (images.length === 0) return ""
 
   const lines: string[] = ["", "", "## Embedded Images", ""]
@@ -140,14 +146,26 @@ export function buildImageMarkdownSection(images: SavedImage[]): string {
     return numA - numB
   })
 
+  // Sanitize a caption for safe inclusion as alt text — the same
+  // rules as the inline-rewrite path: no `]` (would close the alt
+  // bracket early), no embedded newlines (would break the markdown
+  // image syntax across lines).
+  const sanitize = (s: string): string =>
+    s.replace(/[\r\n]+/g, " ").replace(/]/g, ")").trim()
+
   for (const key of ordered) {
     lines.push(`### ${key}`, "")
     for (const img of byPage.get(key) ?? []) {
-      // Empty alt text on purpose — we don't have a caption yet, and
-      // making one up here would just feed the LLM noise. The image
-      // SOURCE (rel_path) carries enough information for the LLM to
-      // refer to it by page number.
-      lines.push(`![](${img.relPath})`)
+      // Caption lookup by SHA-256 — same key the caption pipeline
+      // uses to dedupe across documents. Falling back to empty alt
+      // text if no caption is available for this image (caption
+      // pipeline disabled / failed / didn't run yet on cache hit).
+      // Empty alt is still better than no image reference at all
+      // — the inline LLM-generated text might cite the image by
+      // page number anyway.
+      const caption = captionsBySha?.get(img.sha256)
+      const alt = caption ? sanitize(caption) : ""
+      lines.push(`![${alt}](${img.relPath})`)
     }
     lines.push("")
   }
