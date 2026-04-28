@@ -64,38 +64,52 @@ const JSON_CONTENT_TYPE = "application/json"
  * Origin header for local-LLM endpoints (Ollama, LM Studio, llama.cpp
  * server, LocalAI, vLLM, …).
  *
- * Why we set this explicitly:
- *   `@tauri-apps/plugin-http` v2.5.x auto-injects the webview's
- *   own Origin (`tauri://localhost` on macOS/Linux,
- *   `http://tauri.localhost` on Windows). Ollama's default
- *   `OLLAMA_ORIGINS` allowlist accepts `tauri://*` since ~0.1.30
- *   but NOT `http://tauri.localhost` — so Windows users hit 403
- *   even when everything is configured correctly. A user packet
- *   capture (v0.3.11) confirmed the request carrying
- *   `origin: http://tauri.localhost`.
+ * Always sets `Origin: http://localhost` regardless of where the
+ * actual server is. Two interlocking reasons:
  *
- * Setting Origin to the request's own host = same-origin, which
- * Ollama always trusts regardless of `OLLAMA_ORIGINS` value or
- * Ollama version.
+ *   1. We MUST override the platform default. `@tauri-apps/plugin-
+ *      http` v2.5.x auto-injects the webview's own origin
+ *      (`tauri://localhost` on macOS/Linux,
+ *      `http://tauri.localhost` on Windows). Ollama's default
+ *      `OLLAMA_ORIGINS` allowlist accepts `tauri://*` since ~0.1.30
+ *      but NOT `http://tauri.localhost` — without our override,
+ *      Windows users hit 403. (User packet capture v0.3.11.)
  *
- * Why this works at all:
- *   plugin-http's JS shim respects user-set headers (see
- *   `node_modules/@tauri-apps/plugin-http/dist-js/index.js`,
- *   the loop after `new Request(input, init)` only fills
- *   browser-default headers when the user did NOT already set
- *   them). On the Rust side, the `unsafe-headers` feature flag
- *   in `src-tauri/Cargo.toml` lets reqwest forward Origin
- *   without stripping it. End-to-end this means our value wins.
+ *   2. We can't override with the request's REAL origin because
+ *      that breaks cross-machine LAN setups. A user pointing at
+ *      `http://192.168.0.20:11434/v1` would get `Origin:
+ *      http://192.168.0.20:11434`, which is NOT in Ollama's
+ *      default OLLAMA_ORIGINS — Ollama then 403s or RST-closes
+ *      the connection, surfacing as a generic "error sending
+ *      request" reqwest error. The earlier code claimed Ollama
+ *      did same-origin bypass; it does not. Reported by user
+ *      v0.4.2.
  *
- * If `url` can't be parsed (mis-typed config), we return {} —
- * better to send no override than to crash building the request.
+ * `http://localhost` is unconditionally in Ollama's default
+ * OLLAMA_ORIGINS list (`http://localhost`, `http://localhost:*`,
+ * `http://127.0.0.1*`, etc.). LM Studio / llama.cpp / vLLM /
+ * LocalAI don't check Origin at all, so the value is ignored
+ * there. The header is purely a CORS-allowlist signal — semantic
+ * "where this request came from" is meaningless here because the
+ * server uses API keys (or no auth), not origin, for actual
+ * permission checks.
+ *
+ * Users who actively tightened OLLAMA_ORIGINS to remove localhost
+ * (rare) need to re-add `http://localhost` to their server config;
+ * no client-side fix can satisfy a hand-locked allowlist that
+ * specifically excludes the one origin every other LLM client
+ * also relies on.
+ *
+ * Why this overrides at all: plugin-http's JS shim respects user-
+ * set headers (see `node_modules/@tauri-apps/plugin-http/dist-js/
+ * index.js` — the loop after `new Request(input, init)` only fills
+ * browser-default headers when the user did NOT already set them).
+ * Rust-side, the `unsafe-headers` feature flag in
+ * `src-tauri/Cargo.toml` lets reqwest forward Origin without
+ * stripping it. End-to-end our value wins.
  */
-function sameOriginHeader(url: string): Record<string, string> {
-  try {
-    return { Origin: new URL(url).origin }
-  } catch {
-    return {}
-  }
+function localLlmOriginHeader(): Record<string, string> {
+  return { Origin: "http://localhost" }
 }
 
 function parseOpenAiLine(line: string): string | null {
@@ -474,7 +488,7 @@ export function getProviderConfig(config: LlmConfig): ProviderConfig {
         url: `${ollamaBase}/v1/chat/completions`,
         headers: {
           "Content-Type": JSON_CONTENT_TYPE,
-          ...sameOriginHeader(ollamaBase),
+          ...localLlmOriginHeader(),
         },
         buildBody: (messages, overrides) => {
           const body: Record<string, unknown> = {
@@ -556,7 +570,7 @@ export function getProviderConfig(config: LlmConfig): ProviderConfig {
           // Local OpenAI-compatible servers (LM Studio, llama.cpp,
           // vLLM, LocalAI) often share Ollama's CORS sensitivity.
           // Same rationale as the `ollama` branch above.
-          ...sameOriginHeader(base),
+          ...localLlmOriginHeader(),
         },
         buildBody: (messages, overrides) => ({
           ...buildOpenAiBody(messages, overrides),
