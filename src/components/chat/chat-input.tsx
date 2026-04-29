@@ -1,6 +1,7 @@
 import { useRef, useState, useCallback } from "react"
 import { Send, Square } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { isImeComposing } from "@/lib/keyboard-utils"
 
 interface ChatInputProps {
   onSend: (text: string) => void
@@ -32,6 +33,11 @@ export function ChatInput({ onSend, onStop, isStreaming, placeholder }: ChatInpu
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      // Don't submit on the Enter that commits an IME candidate —
+      // the user is mid-composition (Chinese / Japanese / Korean
+      // input method picking an English word or phrase) and would
+      // see the message fire before they finished typing.
+      if (isImeComposing(e)) return
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault()
         handleSend()

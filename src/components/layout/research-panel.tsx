@@ -14,6 +14,7 @@ import { useWikiStore } from "@/stores/wiki-store"
 import { readFile } from "@/commands/fs"
 import { queueResearch } from "@/lib/deep-research"
 import { normalizePath } from "@/lib/path-utils"
+import { isImeComposing } from "@/lib/keyboard-utils"
 
 export function ResearchPanel() {
   const tasks = useResearchStore((s) => s.tasks)
@@ -64,7 +65,10 @@ export function ResearchPanel() {
         <input
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") handleStartResearch() }}
+          onKeyDown={(e) => {
+            if (isImeComposing(e)) return
+            if (e.key === "Enter") handleStartResearch()
+          }}
           placeholder="Enter a research topic..."
           className="flex-1 rounded border bg-background px-2 py-1 text-xs outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-ring"
         />
