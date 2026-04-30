@@ -271,6 +271,12 @@ function App() {
         console.error("Failed to restore ingest queue:", err)
       )
     })
+    // Same handshake for the dedup-merge queue.
+    import("@/lib/dedup-queue").then(({ restoreQueue }) => {
+      restoreQueue(proj.id, proj.path).catch((err) =>
+        console.error("Failed to restore dedup queue:", err)
+      )
+    })
     // Notify local clip server of the current project + all recent projects
     fetch("http://127.0.0.1:19827/project", {
       method: "POST",

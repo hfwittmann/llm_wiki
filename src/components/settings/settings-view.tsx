@@ -9,6 +9,7 @@ import {
   Image as ImageIcon,
   Network,
   History,
+  Wrench,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { invoke } from "@tauri-apps/api/core"
@@ -27,6 +28,7 @@ import { OutputSection } from "./sections/output-section"
 import { InterfaceSection } from "./sections/interface-section"
 import { NetworkSection } from "./sections/network-section"
 import { ChangelogSection } from "./sections/changelog-section"
+import { MaintenanceSection } from "./sections/maintenance-section"
 import { AboutSection } from "./sections/about-section"
 
 type CategoryId =
@@ -37,6 +39,7 @@ type CategoryId =
   | "network"
   | "output"
   | "interface"
+  | "maintenance"
   | "changelog"
   | "about"
 
@@ -57,6 +60,7 @@ const CATEGORIES: Category[] = [
   { id: "network", labelKey: "settings.categories.network", icon: Network },
   { id: "output", labelKey: "settings.categories.output", icon: Languages },
   { id: "interface", labelKey: "settings.categories.interface", icon: Palette },
+  { id: "maintenance", labelKey: "settings.categories.maintenance", icon: Wrench },
   { id: "changelog", labelKey: "settings.categories.changelog", icon: History },
   { id: "about", labelKey: "settings.categories.about", icon: Info },
 ]
@@ -286,6 +290,8 @@ export function SettingsView() {
         return <OutputSection draft={draft} setDraft={setDraft} />
       case "interface":
         return <InterfaceSection draft={draft} setDraft={setDraft} />
+      case "maintenance":
+        return <MaintenanceSection />
       case "changelog":
         return <ChangelogSection />
       case "about":
@@ -352,8 +358,8 @@ export function SettingsView() {
 
         {/* Global Save bar hidden for sections that persist inline:
             - "llm" saves per-row on every edit (independent per-preset state)
-            - "about" has no editable fields */}
-        {active !== "about" && active !== "llm" && (
+            - "about" / "maintenance" have no draft-bound fields */}
+        {active !== "about" && active !== "llm" && active !== "maintenance" && (
           <div className="shrink-0 border-t bg-background/80 backdrop-blur px-8 py-3">
             <div className="mx-auto flex max-w-2xl items-center justify-between gap-4">
               <p className="text-xs text-muted-foreground">
