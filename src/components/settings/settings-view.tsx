@@ -8,6 +8,7 @@ import {
   Info,
   Image as ImageIcon,
   Network,
+  History,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { invoke } from "@tauri-apps/api/core"
@@ -25,6 +26,7 @@ import { WebSearchSection } from "./sections/web-search-section"
 import { OutputSection } from "./sections/output-section"
 import { InterfaceSection } from "./sections/interface-section"
 import { NetworkSection } from "./sections/network-section"
+import { ChangelogSection } from "./sections/changelog-section"
 import { AboutSection } from "./sections/about-section"
 
 type CategoryId =
@@ -35,6 +37,7 @@ type CategoryId =
   | "network"
   | "output"
   | "interface"
+  | "changelog"
   | "about"
 
 interface Category {
@@ -54,6 +57,7 @@ const CATEGORIES: Category[] = [
   { id: "network", labelKey: "settings.categories.network", icon: Network },
   { id: "output", labelKey: "settings.categories.output", icon: Languages },
   { id: "interface", labelKey: "settings.categories.interface", icon: Palette },
+  { id: "changelog", labelKey: "settings.categories.changelog", icon: History },
   { id: "about", labelKey: "settings.categories.about", icon: Info },
 ]
 
@@ -282,6 +286,8 @@ export function SettingsView() {
         return <OutputSection draft={draft} setDraft={setDraft} />
       case "interface":
         return <InterfaceSection draft={draft} setDraft={setDraft} />
+      case "changelog":
+        return <ChangelogSection />
       case "about":
         return <AboutSection />
     }

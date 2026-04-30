@@ -110,6 +110,7 @@
       "network": "网络",
       "output": "输出偏好",
       "interface": "界面",
+      "changelog": "更新日志",
       "about": "关于"
     },
     "sections": {
@@ -208,6 +209,10 @@
         "description": "界面语言和外观样式。切换后立即生效并持久化。",
         "uiLanguage": "UI 语言",
         "uiLanguageHint": "只影响按钮、标签这些 UI 文案,不影响 AI 输出语言(那个在\"输出偏好\"里单独设置)。"
+      },
+      "changelog": {
+        "title": "更新日志",
+        "description": "每个版本对用户可见的功能改动，最新版本在最前面。"
       },
       "about": {
         "title": "关于",

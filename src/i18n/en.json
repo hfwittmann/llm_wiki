@@ -110,6 +110,7 @@
       "network": "Network",
       "output": "Output",
       "interface": "Interface",
+      "changelog": "Changelog",
       "about": "About"
     },
     "sections": {
@@ -208,6 +209,10 @@
         "description": "UI language and appearance. Changes apply immediately and persist.",
         "uiLanguage": "UI Language",
         "uiLanguageHint": "Affects labels, buttons, and other UI strings only. The AI output language is set separately in Output Preferences."
+      },
+      "changelog": {
+        "title": "Changelog",
+        "description": "Notable user-visible changes in each released version, newest first."
       },
       "about": {
         "title": "About",

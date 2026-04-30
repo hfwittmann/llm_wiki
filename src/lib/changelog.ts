@@ -1,0 +1,122 @@
+/**
+ * Changelog shown in Settings → Changelog. Hardcoded rather than
+ * pulled from GitHub Releases so it works offline and stays under
+ * version control with the code that ships the changes.
+ *
+ * Conventions:
+ *   - Newest version first (the UI renders in array order).
+ *   - Each entry has both `en` and `zh` highlight lists; the
+ *     section picks whichever matches the current i18n language.
+ *   - Only user-visible changes belong here. Internal refactors,
+ *     CI tweaks, and pure test work go in commit messages, not
+ *     here — keep this readable for end users.
+ *   - When releasing a new version: prepend a new entry with the
+ *     same shape, then bump package.json / tauri.conf.json /
+ *     Cargo.toml / Cargo.lock as usual.
+ */
+
+export interface ChangelogEntry {
+  version: string
+  date: string // YYYY-MM-DD
+  highlights: {
+    en: string[]
+    zh: string[]
+  }
+}
+
+export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.4.5",
+    date: "2026-04-30",
+    highlights: {
+      en: [
+        "Settings → Network: global HTTP/HTTPS proxy with live apply (no app restart needed). Local addresses bypass the proxy by default so Ollama / LM Studio / LAN-deployed LLMs keep working.",
+        "Re-ingesting an entity / concept page that already exists now preserves earlier contributions: an LLM merge step combines old + new bodies instead of clobbering, with length / structure sanity checks and a backup snapshot on fallback.",
+        "Frontmatter tags / related fields are now union-merged across re-ingests (previously only sources was protected — earlier-contributed tags and links silently disappeared).",
+      ],
+      zh: [
+        "设置里新增「网络」面板，可配置全局 HTTP/HTTPS 代理，保存即时生效不需要重启应用。本地地址默认不走代理，Ollama / LM Studio / 局域网 LLM 不受影响。",
+        "重新 ingest 同名 entity / concept 页时，由 LLM 把新旧版本合并成一份完整内容，不再直接覆盖丢失之前的贡献；包含长度/结构 sanity 检查，失败时自动备份原版本。",
+        "frontmatter 的 tags / related 字段现在跨多次 ingest 自动并集合并（之前只保护 sources，导致旧文档贡献的 tag 和关联会悄悄消失）。",
+      ],
+    },
+  },
+  {
+    version: "0.4.4",
+    date: "2026-04-28",
+    highlights: {
+      en: [
+        "Native ARM64 Linux builds — .deb and .AppImage now ship for aarch64 (Raspberry Pi, ARM cloud instances, Apple Silicon Linux VMs).",
+        "Visual frontmatter panel for wiki pages: type-coded chips for entity / concept / query, clickable source and related cards that navigate directly to the linked file or page.",
+        "Read-mode default for wiki pages — Obsidian-style [[wikilinks]] render as proper clickable links instead of raw bracketed text. Edit toggle in the top-right keeps the WYSIWYG editor available when needed.",
+        "LLM-generated wiki pages no longer get wrapped in a stray ```yaml ... ``` code fence (prompt rewrite + write-time sanitizer + read-time fallback).",
+        "IME composition Enter no longer triggers chat / search / research submit when typing under a Chinese / Japanese / Korean input method.",
+        'Selecting Claude Code CLI provider in Settings (the "no API key" option) now works across ingest, sweep, lint, chat, sources, and the clip watcher — previously it failed with "LLM not configured" everywhere.',
+      ],
+      zh: [
+        "新增原生 ARM64 Linux 构建（.deb / .AppImage），覆盖树莓派、ARM 云实例、Apple Silicon Linux 虚拟机等。",
+        "Wiki 页面顶部新增可视化 frontmatter 面板：实体 / 概念 / 查询用色块徽章区分，源文件和相关页面用可点击卡片，单击跳转。",
+        "Wiki 页面默认进入阅读模式，Obsidian 风格的 [[wikilink]] 渲染成蓝色可点链接而不是字面括号文本；右上角 Edit 按钮可切回 WYSIWYG 编辑器。",
+        "LLM 生成的 wiki 页面不再被错误地包在 ```yaml ... ``` 代码栅栏里（prompt 改写 + 写盘清洗 + 读取兜底三层防御）。",
+        "中日韩输入法选词时按 Enter 不再误触发聊天 / 搜索 / 研究的提交。",
+        "选用 Claude Code CLI provider（无需 API key）后，导入、聊天、语义 lint、sweep、剪藏导入等所有功能都能正常工作（此前各处都误报 LLM 未配置）。",
+      ],
+    },
+  },
+  {
+    version: "0.4.3",
+    date: "2026-04-28",
+    highlights: {
+      en: [
+        "Fixed Ollama connection failure when configured to a LAN-deployed instance (e.g. http://192.168.x.x:11434). The Origin header is now sent as http://localhost regardless of server address, so Ollama's default OLLAMA_ORIGINS allowlist accepts it.",
+      ],
+      zh: [
+        "修复使用局域网内 Ollama 服务（如 http://192.168.x.x:11434）时连接失败的问题。Origin 请求头现在固定为 http://localhost，匹配 Ollama 默认的 OLLAMA_ORIGINS 白名单。",
+      ],
+    },
+  },
+  {
+    version: "0.4.2",
+    date: "2026-04-28",
+    highlights: {
+      en: [
+        "Project creation dialog now requires picking an AI output language up front — the previous Auto default surprised users with mixed-language output.",
+        "Deleting a project actually removes it from the recent list now (previously the auto-open flow re-added it on next launch).",
+      ],
+      zh: [
+        "创建项目时必须显式选择 AI 输出语言（之前 Auto 默认值会让生成内容混杂语言）。",
+        "删除项目后真正从最近列表里移除（之前重启应用会被自动重新打开流程加回来）。",
+      ],
+    },
+  },
+  {
+    version: "0.4.1",
+    date: "2026-04-27",
+    highlights: {
+      en: [
+        "Polished the update-available notification banner; the download link now opens in the system browser.",
+        "Settings gear and About row keep showing a small red dot when an update is available, even after dismissing the top banner.",
+      ],
+      zh: [
+        "新版本提醒 banner 优化样式，下载链接用系统浏览器打开。",
+        "有可用更新时，设置齿轮按钮和 About 行会显示小红点，即使关闭顶部 banner 也仍然提示。",
+      ],
+    },
+  },
+  {
+    version: "0.4.0",
+    date: "2026-04-26",
+    highlights: {
+      en: [
+        "Multimodal ingest: extract embedded images from PDF / docx / pptx and caption them with a vision model so the wiki page references each image with semantic alt text instead of empty placeholders.",
+        "Image-aware search: results page splits into Pages and Images sections, clicking a thumbnail opens a lightbox and a Jump-to-source button navigates directly into the original document at the right location.",
+        "Folder import + recursive cascade delete with two-stage inline confirmation (no more accidental folder loss from a single misclick).",
+      ],
+      zh: [
+        "多模态导入：从 PDF / docx / pptx 抽出内嵌图片并用视觉模型生成描述，wiki 页面引用图片时带上语义 alt 文本。",
+        "搜索结果新增图片分区：缩略图点击打开 lightbox，跳转到源文档按钮直达图片在原文中的位置。",
+        "支持文件夹批量导入和递归级联删除（删除按钮采用两段式确认，避免误删整个文件夹）。",
+      ],
+    },
+  },
+]
