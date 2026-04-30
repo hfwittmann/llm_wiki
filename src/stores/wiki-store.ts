@@ -74,6 +74,19 @@ interface EmbeddingConfig {
  * behind a single-GPU server's batch slot, so we cap the slider
  * UI at a tasteful max in the settings view.
  */
+/**
+ * Global outbound HTTP proxy. When `enabled` and `url` is a valid
+ * http(s) URL, the Rust setup hook reads this on app launch and
+ * sets HTTP_PROXY / HTTPS_PROXY / NO_PROXY env vars before the
+ * reqwest client used by tauri-plugin-http is constructed. Changes
+ * apply on app restart only.
+ */
+interface ProxyConfig {
+  enabled: boolean
+  url: string
+  bypassLocal: boolean
+}
+
 interface MultimodalConfig {
   enabled: boolean
   /** Reuse `llmConfig` for caption calls. When true, the fields
@@ -163,6 +176,7 @@ interface WikiState {
   embeddingConfig: EmbeddingConfig
   multimodalConfig: MultimodalConfig
   outputLanguage: OutputLanguage
+  proxyConfig: ProxyConfig
   dataVersion: number
 
   setProject: (project: WikiProject | null) => void
@@ -179,6 +193,7 @@ interface WikiState {
   setEmbeddingConfig: (config: EmbeddingConfig) => void
   setMultimodalConfig: (config: MultimodalConfig) => void
   setOutputLanguage: (lang: OutputLanguage) => void
+  setProxyConfig: (config: ProxyConfig) => void
   bumpDataVersion: () => void
 }
 
@@ -241,6 +256,12 @@ export const useWikiStore = create<WikiState>((set) => ({
 
   outputLanguage: "auto",
 
+  proxyConfig: {
+    enabled: false,
+    url: "",
+    bypassLocal: true,
+  },
+
   setLlmConfig: (llmConfig) => set({ llmConfig }),
   setProviderConfigs: (providerConfigs) => set({ providerConfigs }),
   setActivePresetId: (activePresetId) => set({ activePresetId }),
@@ -248,7 +269,8 @@ export const useWikiStore = create<WikiState>((set) => ({
   setEmbeddingConfig: (embeddingConfig) => set({ embeddingConfig }),
   setMultimodalConfig: (multimodalConfig) => set({ multimodalConfig }),
   setOutputLanguage: (outputLanguage) => set({ outputLanguage }),
+  setProxyConfig: (proxyConfig) => set({ proxyConfig }),
   bumpDataVersion: () => set((state) => ({ dataVersion: state.dataVersion + 1 })),
 }))
 
-export type { WikiState, LlmConfig, SearchApiConfig, EmbeddingConfig, MultimodalConfig, OutputLanguage }
+export type { WikiState, LlmConfig, SearchApiConfig, EmbeddingConfig, MultimodalConfig, OutputLanguage, ProxyConfig }

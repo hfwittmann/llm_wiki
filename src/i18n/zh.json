@@ -107,6 +107,7 @@
       "embedding": "向量嵌入",
       "multimodal": "图片描述",
       "webSearch": "网页搜索",
+      "network": "网络",
       "output": "输出偏好",
       "interface": "界面",
       "about": "关于"
@@ -183,6 +184,15 @@
       "webSearch": {
         "title": "网页搜索",
         "description": "Deep Research 会用它拉取最新的外部上下文。"
+      },
+      "network": {
+        "title": "网络",
+        "description": "让所有外部 HTTP 请求（LLM、向量、搜索、更新检查）走代理。点击保存即时生效，不需要重启应用。",
+        "enable": "启用代理",
+        "url": "代理地址",
+        "urlHelp": "完整 URL，必须带协议头。支持：http://、https://（当前版本不支持 SOCKS5）。",
+        "bypassLocal": "本地地址不走代理（推荐）",
+        "bypassLocalHelp": "对 localhost、127.0.0.0/8、10.0.0.0/8、172.16.0.0/12、192.168.0.0/16 以及 *.local 的请求会绕过代理。如果你用 Ollama / LM Studio 或局域网内的 LLM 服务，请保持开启。"
       },
       "output": {
         "title": "输出偏好",

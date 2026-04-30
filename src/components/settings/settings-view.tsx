@@ -7,8 +7,10 @@ import {
   Palette,
   Info,
   Image as ImageIcon,
+  Network,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
+import { invoke } from "@tauri-apps/api/core"
 import i18n from "@/i18n"
 import { Button } from "@/components/ui/button"
 import { useWikiStore } from "@/stores/wiki-store"
@@ -22,6 +24,7 @@ import { MultimodalSection } from "./sections/multimodal-section"
 import { WebSearchSection } from "./sections/web-search-section"
 import { OutputSection } from "./sections/output-section"
 import { InterfaceSection } from "./sections/interface-section"
+import { NetworkSection } from "./sections/network-section"
 import { AboutSection } from "./sections/about-section"
 
 type CategoryId =
@@ -29,6 +32,7 @@ type CategoryId =
   | "embedding"
   | "multimodal"
   | "web-search"
+  | "network"
   | "output"
   | "interface"
   | "about"
@@ -47,6 +51,7 @@ const CATEGORIES: Category[] = [
   { id: "embedding", labelKey: "settings.categories.embedding", icon: Binary },
   { id: "multimodal", labelKey: "settings.categories.multimodal", icon: ImageIcon },
   { id: "web-search", labelKey: "settings.categories.webSearch", icon: Globe },
+  { id: "network", labelKey: "settings.categories.network", icon: Network },
   { id: "output", labelKey: "settings.categories.output", icon: Languages },
   { id: "interface", labelKey: "settings.categories.interface", icon: Palette },
   { id: "about", labelKey: "settings.categories.about", icon: Info },
@@ -58,6 +63,7 @@ function initialDraft(
   embed: ReturnType<typeof useWikiStore.getState>["embeddingConfig"],
   multimodal: ReturnType<typeof useWikiStore.getState>["multimodalConfig"],
   outputLanguage: ReturnType<typeof useWikiStore.getState>["outputLanguage"],
+  proxy: ReturnType<typeof useWikiStore.getState>["proxyConfig"],
   maxHistoryMessages: number,
   uiLanguage: string,
 ): SettingsDraft {
@@ -88,6 +94,9 @@ function initialDraft(
     searchApiKey: search.apiKey,
     outputLanguage,
     maxHistoryMessages,
+    proxyEnabled: proxy.enabled,
+    proxyUrl: proxy.url,
+    proxyBypassLocal: proxy.bypassLocal,
     uiLanguage,
   }
 }
@@ -104,6 +113,8 @@ export function SettingsView() {
   const setMultimodalConfig = useWikiStore((s) => s.setMultimodalConfig)
   const outputLanguage = useWikiStore((s) => s.outputLanguage)
   const setOutputLanguage = useWikiStore((s) => s.setOutputLanguage)
+  const proxyConfig = useWikiStore((s) => s.proxyConfig)
+  const setProxyConfig = useWikiStore((s) => s.setProxyConfig)
   const maxHistoryMessages = useChatStore((s) => s.maxHistoryMessages)
   const setMaxHistoryMessages = useChatStore((s) => s.setMaxHistoryMessages)
   // Drives the red dot next to the "About" row in the settings
@@ -125,6 +136,7 @@ export function SettingsView() {
       embeddingConfig,
       multimodalConfig,
       outputLanguage,
+      proxyConfig,
       maxHistoryMessages,
       i18n.language,
     ),
@@ -139,6 +151,7 @@ export function SettingsView() {
         embeddingConfig,
         multimodalConfig,
         outputLanguage,
+        proxyConfig,
         maxHistoryMessages,
         i18n.language,
       ),
@@ -149,6 +162,7 @@ export function SettingsView() {
     embeddingConfig,
     multimodalConfig,
     outputLanguage,
+    proxyConfig,
     maxHistoryMessages,
   ])
 
@@ -163,6 +177,7 @@ export function SettingsView() {
       saveEmbeddingConfig,
       saveMultimodalConfig,
       saveOutputLanguage,
+      saveProxyConfig,
     } = await import("@/lib/project-store")
 
     const newLlm = {
@@ -201,6 +216,12 @@ export function SettingsView() {
       concurrency: Math.max(1, Math.min(16, draft.multimodalConcurrency || 4)),
     }
 
+    const newProxy = {
+      enabled: draft.proxyEnabled,
+      url: draft.proxyUrl.trim(),
+      bypassLocal: draft.proxyBypassLocal,
+    }
+
     setLlmConfig(newLlm)
     await saveLlmConfig(newLlm)
     setSearchApiConfig(newSearch)
@@ -211,6 +232,17 @@ export function SettingsView() {
     await saveMultimodalConfig(newMultimodal)
     setOutputLanguage(draft.outputLanguage as typeof outputLanguage)
     await saveOutputLanguage(draft.outputLanguage as typeof outputLanguage)
+    setProxyConfig(newProxy)
+    await saveProxyConfig(newProxy)
+    // Apply the proxy env vars LIVE so the next outbound request
+    // picks them up — no app restart needed. tauri-plugin-http
+    // builds a fresh reqwest client per fetch and reqwest reads
+    // env vars at build time, so changing them here is enough.
+    try {
+      await invoke<string>("set_proxy_env", { config: newProxy })
+    } catch (err) {
+      console.warn("[proxy] live update failed; restart will still apply:", err)
+    }
     setMaxHistoryMessages(draft.maxHistoryMessages)
 
     if (draft.uiLanguage !== i18n.language) {
@@ -226,6 +258,7 @@ export function SettingsView() {
     setSearchApiConfig,
     setEmbeddingConfig,
     setOutputLanguage,
+    setProxyConfig,
     setMaxHistoryMessages,
     outputLanguage,
   ])
@@ -243,6 +276,8 @@ export function SettingsView() {
         return <MultimodalSection draft={draft} setDraft={setDraft} />
       case "web-search":
         return <WebSearchSection draft={draft} setDraft={setDraft} />
+      case "network":
+        return <NetworkSection draft={draft} setDraft={setDraft} />
       case "output":
         return <OutputSection draft={draft} setDraft={setDraft} />
       case "interface":
