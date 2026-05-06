@@ -1,6 +1,6 @@
 import { load } from "@tauri-apps/plugin-store"
 import type { WikiProject } from "@/types/wiki"
-import type { LlmConfig, SearchApiConfig, EmbeddingConfig, MultimodalConfig, OutputLanguage, ProviderConfigs, ProxyConfig } from "@/stores/wiki-store"
+import type { LlmConfig, SearchApiConfig, EmbeddingConfig, MultimodalConfig, OutputLanguage, ProviderConfigs, ProxyConfig, ScheduledImportConfig } from "@/stores/wiki-store"
 
 const STORE_NAME = "app-state.json"
 const RECENT_PROJECTS_KEY = "recentProjects"
@@ -131,6 +131,19 @@ export async function saveProxyConfig(config: ProxyConfig): Promise<void> {
 export async function loadProxyConfig(): Promise<ProxyConfig | null> {
   const store = await getStore()
   return (await store.get<ProxyConfig>(PROXY_CONFIG_KEY)) ?? null
+}
+
+const SCHEDULED_IMPORT_KEY = "scheduledImportConfig"
+
+export async function saveScheduledImportConfig(config: ScheduledImportConfig): Promise<void> {
+  const store = await getStore()
+  await store.set(SCHEDULED_IMPORT_KEY, config)
+  await store.save()
+}
+
+export async function loadScheduledImportConfig(): Promise<ScheduledImportConfig | null> {
+  const store = await getStore()
+  return (await store.get<ScheduledImportConfig>(SCHEDULED_IMPORT_KEY)) ?? null
 }
 
 export async function removeFromRecentProjects(

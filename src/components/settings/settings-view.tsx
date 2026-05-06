@@ -10,6 +10,7 @@ import {
   Network,
   History,
   Wrench,
+  Clock,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { invoke } from "@tauri-apps/api/core"
@@ -27,6 +28,7 @@ import { WebSearchSection } from "./sections/web-search-section"
 import { OutputSection } from "./sections/output-section"
 import { InterfaceSection } from "./sections/interface-section"
 import { NetworkSection } from "./sections/network-section"
+import { ScheduledImportSection } from "./sections/scheduled-import-section"
 import { ChangelogSection } from "./sections/changelog-section"
 import { MaintenanceSection } from "./sections/maintenance-section"
 import { AboutSection } from "./sections/about-section"
@@ -37,6 +39,7 @@ type CategoryId =
   | "multimodal"
   | "web-search"
   | "network"
+  | "scheduled-import"
   | "output"
   | "interface"
   | "maintenance"
@@ -58,6 +61,7 @@ const CATEGORIES: Category[] = [
   { id: "multimodal", labelKey: "settings.categories.multimodal", icon: ImageIcon },
   { id: "web-search", labelKey: "settings.categories.webSearch", icon: Globe },
   { id: "network", labelKey: "settings.categories.network", icon: Network },
+  { id: "scheduled-import", labelKey: "settings.categories.scheduledImport", icon: Clock },
   { id: "output", labelKey: "settings.categories.output", icon: Languages },
   { id: "interface", labelKey: "settings.categories.interface", icon: Palette },
   { id: "maintenance", labelKey: "settings.categories.maintenance", icon: Wrench },
@@ -72,6 +76,7 @@ function initialDraft(
   multimodal: ReturnType<typeof useWikiStore.getState>["multimodalConfig"],
   outputLanguage: ReturnType<typeof useWikiStore.getState>["outputLanguage"],
   proxy: ReturnType<typeof useWikiStore.getState>["proxyConfig"],
+  scheduledImport: ReturnType<typeof useWikiStore.getState>["scheduledImportConfig"],
   maxHistoryMessages: number,
   uiLanguage: string,
 ): SettingsDraft {
@@ -105,6 +110,9 @@ function initialDraft(
     proxyEnabled: proxy.enabled,
     proxyUrl: proxy.url,
     proxyBypassLocal: proxy.bypassLocal,
+    scheduledImportEnabled: scheduledImport.enabled,
+    scheduledImportPath: scheduledImport.path,
+    scheduledImportInterval: scheduledImport.interval,
     uiLanguage,
   }
 }
@@ -123,6 +131,8 @@ export function SettingsView() {
   const setOutputLanguage = useWikiStore((s) => s.setOutputLanguage)
   const proxyConfig = useWikiStore((s) => s.proxyConfig)
   const setProxyConfig = useWikiStore((s) => s.setProxyConfig)
+  const scheduledImportConfig = useWikiStore((s) => s.scheduledImportConfig)
+  const setScheduledImportConfig = useWikiStore((s) => s.setScheduledImportConfig)
   const maxHistoryMessages = useChatStore((s) => s.maxHistoryMessages)
   const setMaxHistoryMessages = useChatStore((s) => s.setMaxHistoryMessages)
   // Drives the red dot next to the "About" row in the settings
@@ -145,6 +155,7 @@ export function SettingsView() {
       multimodalConfig,
       outputLanguage,
       proxyConfig,
+      scheduledImportConfig,
       maxHistoryMessages,
       i18n.language,
     ),
@@ -167,6 +178,7 @@ export function SettingsView() {
         multimodalConfig,
         outputLanguage,
         proxyConfig,
+        scheduledImportConfig,
         maxHistoryMessages,
         prev.uiLanguage,
       ),
@@ -178,6 +190,7 @@ export function SettingsView() {
     multimodalConfig,
     outputLanguage,
     proxyConfig,
+    scheduledImportConfig,
     maxHistoryMessages,
   ])
 
@@ -193,6 +206,7 @@ export function SettingsView() {
       saveMultimodalConfig,
       saveOutputLanguage,
       saveProxyConfig,
+      saveScheduledImportConfig,
     } = await import("@/lib/project-store")
 
     const newLlm = {
@@ -258,6 +272,16 @@ export function SettingsView() {
     } catch (err) {
       console.warn("[proxy] live update failed; restart will still apply:", err)
     }
+
+    const newScheduledImport = {
+      enabled: draft.scheduledImportEnabled,
+      path: draft.scheduledImportPath,
+      interval: draft.scheduledImportInterval,
+      lastScan: scheduledImportConfig.lastScan,
+    }
+    setScheduledImportConfig(newScheduledImport)
+    await saveScheduledImportConfig(newScheduledImport)
+
     setMaxHistoryMessages(draft.maxHistoryMessages)
 
     if (draft.uiLanguage !== i18n.language) {
@@ -274,6 +298,8 @@ export function SettingsView() {
     setEmbeddingConfig,
     setOutputLanguage,
     setProxyConfig,
+    setScheduledImportConfig,
+    scheduledImportConfig,
     setMaxHistoryMessages,
     outputLanguage,
   ])
@@ -293,6 +319,8 @@ export function SettingsView() {
         return <WebSearchSection draft={draft} setDraft={setDraft} />
       case "network":
         return <NetworkSection draft={draft} setDraft={setDraft} />
+      case "scheduled-import":
+        return <ScheduledImportSection draft={draft} setDraft={setDraft} />
       case "output":
         return <OutputSection draft={draft} setDraft={setDraft} />
       case "interface":

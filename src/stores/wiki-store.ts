@@ -87,6 +87,13 @@ interface ProxyConfig {
   bypassLocal: boolean
 }
 
+interface ScheduledImportConfig {
+  enabled: boolean
+  path: string // 监控目录的绝对路径
+  interval: number // 扫描间隔（分钟）
+  lastScan: number | null // 上次扫描时间戳
+}
+
 interface MultimodalConfig {
   enabled: boolean
   /** Reuse `llmConfig` for caption calls. When true, the fields
@@ -177,6 +184,7 @@ interface WikiState {
   multimodalConfig: MultimodalConfig
   outputLanguage: OutputLanguage
   proxyConfig: ProxyConfig
+  scheduledImportConfig: ScheduledImportConfig
   dataVersion: number
 
   setProject: (project: WikiProject | null) => void
@@ -194,6 +202,7 @@ interface WikiState {
   setMultimodalConfig: (config: MultimodalConfig) => void
   setOutputLanguage: (lang: OutputLanguage) => void
   setProxyConfig: (config: ProxyConfig) => void
+  setScheduledImportConfig: (config: ScheduledImportConfig) => void
   bumpDataVersion: () => void
 }
 
@@ -262,6 +271,13 @@ export const useWikiStore = create<WikiState>((set) => ({
     bypassLocal: true,
   },
 
+  scheduledImportConfig: {
+    enabled: false,
+    path: "",
+    interval: 60,
+    lastScan: null,
+  },
+
   setLlmConfig: (llmConfig) => set({ llmConfig }),
   setProviderConfigs: (providerConfigs) => set({ providerConfigs }),
   setActivePresetId: (activePresetId) => set({ activePresetId }),
@@ -270,7 +286,8 @@ export const useWikiStore = create<WikiState>((set) => ({
   setMultimodalConfig: (multimodalConfig) => set({ multimodalConfig }),
   setOutputLanguage: (outputLanguage) => set({ outputLanguage }),
   setProxyConfig: (proxyConfig) => set({ proxyConfig }),
+  setScheduledImportConfig: (scheduledImportConfig) => set({ scheduledImportConfig }),
   bumpDataVersion: () => set((state) => ({ dataVersion: state.dataVersion + 1 })),
 }))
 
-export type { WikiState, LlmConfig, SearchApiConfig, EmbeddingConfig, MultimodalConfig, OutputLanguage, ProxyConfig }
+export type { WikiState, LlmConfig, SearchApiConfig, EmbeddingConfig, MultimodalConfig, OutputLanguage, ProxyConfig, ScheduledImportConfig }

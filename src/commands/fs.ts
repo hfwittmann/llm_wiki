@@ -50,6 +50,10 @@ export async function fileExists(path: string): Promise<boolean> {
   return invoke<boolean>("file_exists", { path })
 }
 
+export async function getFileModifiedTime(path: string): Promise<number> {
+  return invoke<number>("get_file_modified_time", { path })
+}
+
 /** Mirror of `commands::fs::FileBase64` (Rust side). */
 export interface FileBase64 {
   base64: string
