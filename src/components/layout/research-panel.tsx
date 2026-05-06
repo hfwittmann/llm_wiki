@@ -15,7 +15,7 @@ import { readFile } from "@/commands/fs"
 import { queueResearch } from "@/lib/deep-research"
 import { normalizePath } from "@/lib/path-utils"
 import { isImeComposing } from "@/lib/keyboard-utils"
-import { MermaidDiagram } from "@/components/mermaid-diagram"
+import { MermaidDiagram, unwrapMermaidPre } from "@/components/mermaid-diagram"
 
 export function ResearchPanel() {
   const tasks = useResearchStore((s) => s.tasks)
@@ -184,6 +184,11 @@ function SynthesisBlock({ synthesis, isStreaming }: { synthesis: string; isStrea
               td: ({ children, ...props }) => (
                 <td className="border border-border/60 px-3 py-1.5" {...props}>{children}</td>
               ),
+              pre: ({ children, ...props }) => {
+                const mermaid = unwrapMermaidPre(children)
+                if (mermaid) return <>{mermaid}</>
+                return <pre {...props}>{children}</pre>
+              },
               code: ({ className, children, ...props }) => {
                 const lang = className?.replace("language-", "")
                 const codeText = String(children).replace(/\n$/, "")

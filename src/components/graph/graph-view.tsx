@@ -14,6 +14,7 @@ import { findSurprisingConnections, detectKnowledgeGaps, type SurprisingConnecti
 import { queueResearch } from "@/lib/deep-research"
 import { optimizeResearchTopic } from "@/lib/optimize-research-topic"
 import { normalizePath } from "@/lib/path-utils"
+import { shouldHideEdgeByNodeTypes, shouldHideNodeType } from "@/lib/graph-visibility"
 
 const NODE_TYPE_COLORS: Record<string, string> = {
   entity: "#60a5fa",    // blue-400
@@ -186,9 +187,7 @@ function HiddenTypeManager({ hiddenTypes }: { hiddenTypes: Set<string> }) {
       graph.forEachEdge((e, _attrs, source, target) => {
         const sourceType = graph.getNodeAttribute(source, "nodeType") as string | undefined
         const targetType = graph.getNodeAttribute(target, "nodeType") as string | undefined
-        const shouldHide = (sourceType && hiddenTypes.has(sourceType)) ||
-                          (targetType && hiddenTypes.has(targetType))
-        if (shouldHide) {
+        if (shouldHideEdgeByNodeTypes(sourceType, targetType, hiddenTypes)) {
           graph.setEdgeAttribute(e, "hidden", true)
         } else {
           graph.removeEdgeAttribute(e, "hidden")
@@ -616,7 +615,7 @@ export function GraphView() {
               nodeReducer: (_node, attrs) => {
                 const result = { ...attrs }
                 const nodeType = attrs.nodeType as string
-                if (hiddenTypes.has(nodeType)) {
+                if (shouldHideNodeType(nodeType, hiddenTypes)) {
                   result.hidden = true
                   return result
                 }

@@ -20,7 +20,7 @@ import { resolveMarkdownImageSrc } from "@/lib/markdown-image-resolver"
 import { parseFrontmatter } from "@/lib/frontmatter"
 import { FrontmatterPanel } from "@/components/editor/frontmatter-panel"
 import { useWikiStore } from "@/stores/wiki-store"
-import { MermaidDiagram } from "@/components/mermaid-diagram"
+import { MermaidDiagram, unwrapMermaidPre } from "@/components/mermaid-diagram"
 
 interface FilePreviewProps {
   filePath: string
@@ -224,6 +224,11 @@ function TextPreview({ filePath, content, label }: { filePath: string; content: 
             td: ({ children, ...props }) => (
               <td className="border border-border/60 px-3 py-1.5" {...props}>{children}</td>
             ),
+            pre: ({ children, ...props }) => {
+              const mermaid = unwrapMermaidPre(children)
+              if (mermaid) return <>{mermaid}</>
+              return <pre {...props}>{children}</pre>
+            },
             code: ({ className, children, ...props }) => {
               const lang = className?.replace("language-", "")
               const codeText = String(children).replace(/\n$/, "")
