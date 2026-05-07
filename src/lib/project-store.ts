@@ -133,17 +133,33 @@ export async function loadProxyConfig(): Promise<ProxyConfig | null> {
   return (await store.get<ProxyConfig>(PROXY_CONFIG_KEY)) ?? null
 }
 
-const SCHEDULED_IMPORT_KEY = "scheduledImportConfig"
+const SCHEDULED_IMPORT_KEY_PREFIX = "scheduledImportConfig:"
 
-export async function saveScheduledImportConfig(config: ScheduledImportConfig): Promise<void> {
+function scheduledImportKey(projectPath: string): string {
+  return `${SCHEDULED_IMPORT_KEY_PREFIX}${normalizePath(projectPath)}`
+}
+
+const SCHEDULED_IMPORT_GLOBAL_KEY = "scheduledImportConfig"
+
+export async function saveScheduledImportConfig(projectPath: string, config: ScheduledImportConfig): Promise<void> {
   const store = await getStore()
-  await store.set(SCHEDULED_IMPORT_KEY, config)
+  await store.set(scheduledImportKey(projectPath), config)
   await store.save()
 }
 
-export async function loadScheduledImportConfig(): Promise<ScheduledImportConfig | null> {
+export async function loadScheduledImportConfig(projectPath: string): Promise<ScheduledImportConfig | null> {
   const store = await getStore()
-  return (await store.get<ScheduledImportConfig>(SCHEDULED_IMPORT_KEY)) ?? null
+  const perProject = await store.get<ScheduledImportConfig>(scheduledImportKey(projectPath))
+  if (perProject) return perProject
+  // Migrate from legacy global key (pre-0.4.8)
+  const legacy = await store.get<ScheduledImportConfig>(SCHEDULED_IMPORT_GLOBAL_KEY)
+  if (legacy) {
+    await store.set(scheduledImportKey(projectPath), legacy)
+    await store.delete(SCHEDULED_IMPORT_GLOBAL_KEY)
+    await store.save()
+    return legacy
+  }
+  return null
 }
 
 export async function removeFromRecentProjects(

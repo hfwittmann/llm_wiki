@@ -180,10 +180,11 @@ export async function scanAndImport(projectPath: string, importPath: string): Pr
 
     // Update last scan time
     const config = useWikiStore.getState().scheduledImportConfig
-    useWikiStore.getState().setScheduledImportConfig({
-      ...config,
-      lastScan: Date.now(),
-    })
+    const updatedConfig = { ...config, lastScan: Date.now() }
+    useWikiStore.getState().setScheduledImportConfig(updatedConfig)
+    // Persist per-project config
+    const { saveScheduledImportConfig } = await import("@/lib/project-store")
+    await saveScheduledImportConfig(projectPath, updatedConfig)
 
     // Refresh file tree
     const { listDirectory: listDir } = await import("@/commands/fs")

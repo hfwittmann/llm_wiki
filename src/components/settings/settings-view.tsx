@@ -124,6 +124,7 @@ function initialDraft(
 
 export function SettingsView() {
   const { t } = useTranslation()
+  const project = useWikiStore((s) => s.project)
   const llmConfig = useWikiStore((s) => s.llmConfig)
   const setLlmConfig = useWikiStore((s) => s.setLlmConfig)
   const searchApiConfig = useWikiStore((s) => s.searchApiConfig)
@@ -285,7 +286,9 @@ export function SettingsView() {
       lastScan: scheduledImportConfig.lastScan,
     }
     setScheduledImportConfig(newScheduledImport)
-    await saveScheduledImportConfig(newScheduledImport)
+    if (project) {
+      await saveScheduledImportConfig(project.path, newScheduledImport)
+    }
 
     setMaxHistoryMessages(draft.maxHistoryMessages)
 
@@ -298,6 +301,7 @@ export function SettingsView() {
     setTimeout(() => setSaved(false), 2000)
   }, [
     draft,
+    project,
     setLlmConfig,
     setSearchApiConfig,
     setEmbeddingConfig,

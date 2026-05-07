@@ -5,7 +5,7 @@ import { useWikiStore } from "@/stores/wiki-store"
 import { useReviewStore } from "@/stores/review-store"
 import { useChatStore } from "@/stores/chat-store"
 import { listDirectory, openProject } from "@/commands/fs"
-import { getLastProject, getRecentProjects, saveLastProject, loadLlmConfig, loadLanguage, loadSearchApiConfig, loadEmbeddingConfig, loadMultimodalConfig, loadOutputLanguage, loadProviderConfigs, loadActivePresetId, loadProxyConfig, loadScheduledImportConfig } from "@/lib/project-store"
+import { getLastProject, getRecentProjects, saveLastProject, loadLlmConfig, loadLanguage, loadSearchApiConfig, loadEmbeddingConfig, loadMultimodalConfig, loadOutputLanguage, loadProviderConfigs, loadActivePresetId, loadProxyConfig, loadScheduledImportConfig, saveScheduledImportConfig } from "@/lib/project-store"
 import { loadReviewItems, loadChatHistory } from "@/lib/persist"
 import { setupAutoSave } from "@/lib/auto-save"
 import { startClipWatcher } from "@/lib/clip-watcher"
@@ -226,10 +226,6 @@ function App() {
         if (savedProxy) {
           useWikiStore.getState().setProxyConfig(savedProxy)
         }
-        const savedScheduledImport = await loadScheduledImportConfig()
-        if (savedScheduledImport) {
-          useWikiStore.getState().setScheduledImportConfig(savedScheduledImport)
-        }
         const savedLang = await loadLanguage()
         if (savedLang) {
           await i18n.changeLanguage(savedLang)
@@ -281,6 +277,23 @@ function App() {
         console.error("Failed to restore dedup queue:", err)
       )
     })
+    // Load per-project scheduled import config
+    try {
+      const savedScheduledImport = await loadScheduledImportConfig(proj.path)
+      if (savedScheduledImport) {
+        useWikiStore.getState().setScheduledImportConfig(savedScheduledImport)
+      } else {
+        // Reset to default for new projects
+        useWikiStore.getState().setScheduledImportConfig({
+          enabled: false,
+          path: "raw",
+          interval: 60,
+          lastScan: null,
+        })
+      }
+    } catch {
+      // ignore
+    }
     // Start scheduled import if enabled
     const scheduledImportConfig = useWikiStore.getState().scheduledImportConfig
     if (scheduledImportConfig.enabled && scheduledImportConfig.path && scheduledImportConfig.interval > 0) {
@@ -369,12 +382,12 @@ function App() {
       stopScheduledImport()
     }).catch(() => {})
 
-    // Reset scheduled import path to default when switching projects
-    const currentConfig = useWikiStore.getState().scheduledImportConfig
-    useWikiStore.getState().setScheduledImportConfig({
-      ...currentConfig,
-      path: "raw",
-    })
+    // Save current project's scheduled import config before clearing
+    const currentProject = useWikiStore.getState().project
+    if (currentProject) {
+      const currentConfig = useWikiStore.getState().scheduledImportConfig
+      saveScheduledImportConfig(currentProject.path, currentConfig).catch(() => {})
+    }
 
     // Clear all per-project state BEFORE flipping back to the welcome screen
     // so old data cannot leak in via any async render pass.
