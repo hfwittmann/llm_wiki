@@ -202,12 +202,12 @@ export async function scanAndImport(projectPath: string, importPath: string): Pr
 /**
  * Resolve the absolute path for scheduled import.
  * If the config path is relative (not absolute), prepend the project path.
- * If the config path is empty, use the default "raw" directory.
+ * If the config path is empty, use the default "raw/sources" directory.
  */
 export function resolveImportPath(projectPath: string, configPath: string): string {
   const pp = normalizePath(projectPath)
-  // Default to "raw" if path is empty
-  const path = configPath || "raw"
+  // Default to "raw/sources" if path is empty
+  const path = configPath || "raw/sources"
   // If path is already absolute, use it as-is
   if (path.startsWith("/") || path.match(/^[a-zA-Z]:\\/)) {
     return normalizePath(path)

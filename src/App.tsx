@@ -286,7 +286,7 @@ function App() {
         // Reset to default for new projects
         useWikiStore.getState().setScheduledImportConfig({
           enabled: false,
-          path: "raw",
+          path: "raw/sources",
           interval: 60,
           lastScan: null,
         })

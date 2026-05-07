@@ -112,7 +112,7 @@ export function ScheduledImportSection({ draft, setDraft }: Props) {
           <Input
             value={draft.scheduledImportPath}
             onChange={(e) => setDraft("scheduledImportPath", e.target.value)}
-            placeholder="raw"
+            placeholder="raw/sources"
             disabled={!draft.scheduledImportEnabled}
             className="flex-1"
           />

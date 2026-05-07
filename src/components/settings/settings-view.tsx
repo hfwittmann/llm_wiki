@@ -80,10 +80,10 @@ function initialDraft(
   maxHistoryMessages: number,
   uiLanguage: string,
 ): SettingsDraft {
-  // Resolve the display path: if path is empty, show default "raw"
+  // Resolve the display path: if path is empty, show default "raw/sources"
   // If path is relative, show it as-is (user sees relative path)
   // If path is absolute, show it as-is
-  const displayPath = scheduledImport.path || "raw"
+  const displayPath = scheduledImport.path || "raw/sources"
 
   return {
     provider: llm.provider,
