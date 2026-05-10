@@ -91,6 +91,14 @@ describe("project file sync", () => {
     const { useFileSyncStore } = await import("@/stores/file-sync-store")
     await import("@/lib/project-file-sync").then((m) => m.stopProjectFileSync())
     useWikiStore.getState().setProject(null)
+    useWikiStore.getState().setLlmConfig({
+      provider: "openai",
+      apiKey: "k",
+      model: "m",
+      ollamaUrl: "",
+      customEndpoint: "",
+      maxContextSize: 128000,
+    })
     useFileSyncStore.getState().clear()
   })
 
