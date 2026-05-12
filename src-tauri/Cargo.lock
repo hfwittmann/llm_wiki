@@ -4420,7 +4420,7 @@ checksum = "11d3d7f243d5c5a8b9bb5d6dd2b1602c0cb0b9db1621bafc7ed66e35ff9fe092"
 
 [[package]]
 name = "llm-wiki"
-version = "0.4.6"
+version = "0.4.8.2"
 dependencies = [
  "arrow-array",
  "arrow-schema",
@@ -4431,6 +4431,7 @@ dependencies = [
  "futures",
  "image",
  "lancedb",
+ "md5",
  "pdfium-render",
  "serde",
  "serde_json",
@@ -4631,6 +4632,12 @@ dependencies = [
  "cfg-if",
  "digest",
 ]
+
+[[package]]
+name = "md5"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "490cc448043f947bae3cbee9c203358d62dbee0db12107a74be5c30ccfd09771"
 
 [[package]]
 name = "measure_time"
