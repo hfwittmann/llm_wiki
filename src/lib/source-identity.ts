@@ -2,6 +2,7 @@ import { getFileName, normalizePath } from "@/lib/path-utils"
 
 const RAW_SOURCES_PREFIX = "raw/sources/"
 const RAW_SOURCES_MARKER = "/raw/sources/"
+const MAX_SOURCE_SUMMARY_SLUG_LENGTH = 120
 
 export function sourceIdentityForPath(projectPath: string, sourcePath: string): string {
   const pp = normalizePath(projectPath).replace(/\/+$/, "")
@@ -45,6 +46,7 @@ export function sourceSummarySlugFromIdentity(sourceIdentity: string): string {
     return parts[0] || "source"
   }
 
+  const hash = stableSlugHash(sourceIdentity)
   const slug = parts.map((part) => {
     const encoded = encodeURIComponent(part).replace(
       /[!'()*]/g,
@@ -52,7 +54,20 @@ export function sourceSummarySlugFromIdentity(sourceIdentity: string): string {
     )
     return `${encoded.length}-${encoded}`
   }).join("--")
-  return `${slug}--${stableSlugHash(sourceIdentity)}`
+  const fullSlug = `${slug}--${hash}`
+  if (fullSlug.length <= MAX_SOURCE_SUMMARY_SLUG_LENGTH) {
+    return fullSlug
+  }
+
+  const readableLimit = MAX_SOURCE_SUMMARY_SLUG_LENGTH - hash.length - 2
+  const readablePrefix = trimIncompletePercentEncoding(slug.slice(0, readableLimit))
+    .replace(/-+$/, "")
+    .replace(/%$/, "")
+  return `${readablePrefix || "source"}--${hash}`
+}
+
+function trimIncompletePercentEncoding(value: string): string {
+  return value.replace(/%(?:[0-9A-F])?$/i, "")
 }
 
 function stableSlugHash(value: string): string {

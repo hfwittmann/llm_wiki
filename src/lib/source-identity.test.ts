@@ -48,4 +48,21 @@ describe("source identity helpers", () => {
       sourceSummarySlugFromIdentity("a--b/config.yaml"),
     )
   })
+
+  it("caps nested source summary slugs to avoid Windows path length failures", () => {
+    const slug = sourceSummarySlugFromIdentity("2024年/污水处理/反硝化除磷技术研究报告.pdf")
+
+    expect(slug.length).toBeLessThanOrEqual(120)
+    expect(`wiki/sources/${slug}.md`.length).toBeLessThanOrEqual(136)
+    expect(slug).toMatch(/--[a-z0-9]+$/)
+  })
+
+  it("keeps stable hashes when truncating long nested source slugs", () => {
+    const first = sourceSummarySlugFromIdentity("2024年/污水处理/反硝化除磷技术研究报告.pdf")
+    const second = sourceSummarySlugFromIdentity("2024年/污水处理/反硝化除磷技术研究报告修订版.pdf")
+
+    expect(first).not.toBe(second)
+    expect(first.length).toBeLessThanOrEqual(120)
+    expect(second.length).toBeLessThanOrEqual(120)
+  })
 })

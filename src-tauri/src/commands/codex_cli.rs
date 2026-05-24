@@ -65,6 +65,16 @@ fn find_codex_command() -> Result<PathBuf, String> {
     which::which("codex").map_err(|_| "`codex` not found on PATH".to_string())
 }
 
+fn suppress_windows_console(_cmd: &mut Command) {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        _cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+}
+
 #[tauri::command]
 pub async fn codex_cli_detect() -> Result<DetectResult, String> {
     let path = match find_codex_command() {
@@ -80,11 +90,9 @@ pub async fn codex_cli_detect() -> Result<DetectResult, String> {
     };
 
     let path_str = path.to_string_lossy().to_string();
-    let output = tokio::time::timeout(
-        Duration::from_secs(3),
-        Command::new(&path).arg("--version").output(),
-    )
-    .await;
+    let mut cmd = Command::new(&path);
+    suppress_windows_console(&mut cmd);
+    let output = tokio::time::timeout(Duration::from_secs(3), cmd.arg("--version").output()).await;
 
     match output {
         Ok(Ok(out)) if out.status.success() => {
@@ -138,6 +146,7 @@ pub async fn codex_cli_spawn(
 
     let codex = find_codex_command()?;
     let mut cmd = Command::new(&codex);
+    suppress_windows_console(&mut cmd);
     cmd.arg("-a")
         .arg("never")
         .arg("exec")
