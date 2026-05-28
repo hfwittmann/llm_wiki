@@ -802,7 +802,7 @@ export function GraphView() {
         {/* Graph canvas */}
         <div
           ref={graphContainerRef}
-          className="relative flex-1 min-w-0 overflow-hidden bg-slate-50 dark:bg-slate-950"
+          className="relative flex-1 min-w-0 overflow-hidden bg-background"
           onContextMenu={(e) => e.preventDefault()}
           onClick={() => setNodeMenu(null)}
         >

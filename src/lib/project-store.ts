@@ -217,6 +217,18 @@ export async function loadLanguage(): Promise<string | null> {
   return (await store.get<string>(LANGUAGE_KEY)) ?? null
 }
 
+const THEME_KEY = "theme"
+
+export async function saveTheme(theme: "light" | "dark" | "system"): Promise<void> {
+  const store = await getStore()
+  await store.set(THEME_KEY, theme)
+}
+
+export async function loadTheme(): Promise<"light" | "dark" | "system" | null> {
+  const store = await getStore()
+  return (await store.get<"light" | "dark" | "system">(THEME_KEY)) ?? null
+}
+
 const OUTPUT_LANGUAGE_KEY = "outputLanguage"
 const PROJECT_OUTPUT_LANGUAGE_KEY = "projectOutputLanguages"
 const PROJECT_FILE_SYNC_KEY = "projectFileSyncEnabled"

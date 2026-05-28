@@ -94,6 +94,8 @@ describe("ingest-queue persistence — write", () => {
         return false
       }
     })
+    // Add small delay to ensure file is fully written
+    await new Promise(resolve => setTimeout(resolve, 50))
     const parsed = JSON.parse(await readQueueFile())
     expect(parsed[0].sourcePath).toBe("raw/sources/a.md")
   })
@@ -105,12 +107,15 @@ describe("ingest-queue persistence — write", () => {
     ])
     await waitFor(async () => {
       try {
-        const parsed = JSON.parse(await readQueueFile())
+        const c = await readQueueFile()
+        const parsed = JSON.parse(c)
         return parsed.length === 1
       } catch {
         return false
       }
     })
+    // Add small delay to ensure file is fully written
+    await new Promise(resolve => setTimeout(resolve, 50))
     const parsed = JSON.parse(await readQueueFile())
     expect(parsed).toHaveLength(1)
     expect(parsed[0].sourcePath).toBe("raw/sources/a.md")
@@ -129,6 +134,8 @@ describe("ingest-queue persistence — write", () => {
         return false
       }
     })
+    // Add small delay to ensure file is fully written
+    await new Promise(resolve => setTimeout(resolve, 50))
     const parsed = JSON.parse(await readQueueFile()) as Array<{ sourcePath: string; folderContext: string }>
     const paths = parsed.map((p) => p.sourcePath)
     expect(paths).toContain("raw/sources/注意力机制.pdf")
@@ -269,6 +276,8 @@ describe("ingest-queue persistence — restore round-trip", () => {
         return false
       }
     })
+    // Add small delay to ensure file is fully written
+    await new Promise(resolve => setTimeout(resolve, 50))
     // Verify on-disk state before we blow away memory
     const onDisk = JSON.parse(await readQueueFile()) as Array<{ sourcePath: string; folderContext: string }>
     expect(onDisk[0].sourcePath).toBe("raw/sources/注意力.pdf")

@@ -65,6 +65,7 @@ export interface SettingsDraft {
 
   // UI
   uiLanguage: string
+  theme: "light" | "dark" | "system"
 
   // Source folder auto watch
   sourceWatchConfig: SourceWatchConfig

@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button"
 import { useWikiStore } from "@/stores/wiki-store"
 import { useChatStore } from "@/stores/chat-store"
 import { useUpdateStore, hasAvailableUpdate } from "@/stores/update-store"
-import { loadSourceWatchConfig, saveLanguage } from "@/lib/project-store"
+import { loadSourceWatchConfig, saveLanguage, saveTheme, loadTheme } from "@/lib/project-store"
 import type { SettingsDraft, DraftSetter } from "./settings-types"
 import { normalizeSourceWatchConfig } from "@/lib/source-watch-config"
 import { LlmProviderSection } from "./sections/llm-provider-section"
@@ -90,6 +90,7 @@ function initialDraft(
   maxHistoryMessages: number,
   uiLanguage: string,
   projectPath?: string,
+  theme?: "light" | "dark" | "system",
 ): SettingsDraft {
   // Show absolute path: if stored path is empty, show default using project path
   // If stored path is relative (legacy), prepend project path
@@ -145,6 +146,24 @@ function initialDraft(
     apiAllowUnauthenticated: apiConfig.allowUnauthenticated,
     apiToken: apiConfig.token,
     uiLanguage,
+    theme: theme ?? "system",
+  }
+}
+
+function applyTheme(theme: "light" | "dark" | "system") {
+  const root = document.documentElement
+  if (theme === "system") {
+    // Remove the class and let the media query handle it
+    root.classList.remove("light", "dark")
+    // Check system preference
+    if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+      root.classList.add("dark")
+    } else {
+      root.classList.add("light")
+    }
+  } else {
+    root.classList.remove("light", "dark")
+    root.classList.add(theme)
   }
 }
 
@@ -181,6 +200,7 @@ export function SettingsView() {
 
   const [active, setActive] = useState<CategoryId>("llm")
   const [saved, setSaved] = useState(false)
+  const [currentTheme, setCurrentTheme] = useState<"light" | "dark" | "system">("system")
   const [draft, setDraftState] = useState<SettingsDraft>(() =>
     initialDraft(
       llmConfig,
@@ -196,6 +216,16 @@ export function SettingsView() {
       project?.path,
     ),
   )
+
+  // Load theme on mount
+  useEffect(() => {
+    loadTheme().then((theme) => {
+      if (theme) {
+        setCurrentTheme(theme)
+        setDraftState((prev) => ({ ...prev, theme }))
+      }
+    }).catch(() => {})
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -394,6 +424,14 @@ export function SettingsView() {
       await saveLanguage(draft.uiLanguage)
     }
 
+    // Save theme
+    if (draft.theme !== currentTheme) {
+      await saveTheme(draft.theme)
+      setCurrentTheme(draft.theme)
+      // Apply theme immediately
+      applyTheme(draft.theme)
+    }
+
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }, [
@@ -435,7 +473,7 @@ export function SettingsView() {
       case "output":
         return <OutputSection draft={draft} setDraft={setDraft} />
       case "interface":
-        return <InterfaceSection draft={draft} setDraft={setDraft} />
+        return <InterfaceSection draft={draft} setDraft={setDraft} onThemeChange={applyTheme} />
       case "maintenance":
         return <MaintenanceSection />
       case "changelog":
