@@ -37,10 +37,9 @@ export interface SavedImage {
  *  are XML-rendered shapes, not embedded raster). Adding them later is
  *  a one-line change here. */
 const SUPPORTED_PDF_EXTS = ["pdf"] as const
-const SUPPORTED_OFFICE_EXTS = ["pptx", "docx", "ppt", "doc"] as const
-// Note: ppt / doc (legacy binary formats) won't actually work — they
-// aren't ZIP. Listed for completeness; Rust side will return Err which
-// the caller treats as "no images" gracefully.
+const SUPPORTED_OFFICE_EXTS = ["pptx", "docx"] as const
+// Legacy binary .doc/.ppt text extraction is handled separately; image
+// extraction here is ZIP-based and only supports OOXML files.
 const MARKDOWN_IMAGE_EXTS = new Set([
   "png",
   "jpg",

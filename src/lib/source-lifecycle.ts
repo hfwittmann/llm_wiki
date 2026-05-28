@@ -41,6 +41,7 @@ export const INGESTABLE_SOURCE_EXTENSIONS = new Set([
   "mdx",
   "txt",
   "pdf",
+  "doc",
   "docx",
   "pptx",
   "xlsx",
