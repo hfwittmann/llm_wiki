@@ -87,7 +87,7 @@ export function ReviewView() {
         const linkTarget = fileName.replace(/\.md$/, "")
         const entry = `- [[queries/${linkTarget}|${title}]]`
         if (indexContent.includes("## Queries")) {
-          indexContent = indexContent.replace(/(## Queries\n)/, `$1${entry}\n`)
+          indexContent = indexContent.replace(/(## Queries\n)/, (match) => `${match}${entry}\n`)
         } else {
           indexContent = indexContent.trimEnd() + "\n\n## Queries\n" + entry + "\n"
         }
@@ -104,6 +104,7 @@ export function ReviewView() {
         setFileTree(tree)
         useWikiStore.getState().setSelectedFile(filePath)
         useWikiStore.getState().setFileContent(pageContent)
+        useWikiStore.getState().bumpDataVersion()
 
         resolveItem(id, "Saved to Wiki")
       } catch (err) {
@@ -197,7 +198,7 @@ export function ReviewView() {
           const linkTarget = fileName.replace(/\.md$/, "")
           const entry = `- [[${dir}/${linkTarget}|${title}]]`
           if (indexContent.includes(sectionHeader)) {
-            indexContent = indexContent.replace(new RegExp(`(${sectionHeader}\n)`), `$1${entry}\n`)
+            indexContent = indexContent.replace(new RegExp(`(${sectionHeader}\n)`), (match) => `${match}${entry}\n`)
           } else {
             indexContent = indexContent.trimEnd() + `\n\n${sectionHeader}\n${entry}\n`
           }

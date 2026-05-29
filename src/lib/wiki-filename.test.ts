@@ -58,6 +58,13 @@ describe("makeQuerySlug", () => {
     expect(makeQuerySlug(long)).toHaveLength(50)
   })
 
+  it("truncates by Unicode code point rather than leaving a lone surrogate", () => {
+    const astral = "𠀀".repeat(60)
+    const slug = makeQuerySlug(astral)
+    expect(Array.from(slug)).toHaveLength(50)
+    expect(() => encodeURIComponent(slug)).not.toThrow()
+  })
+
   it("preserves case-insensitive equivalence for wikilink matching", () => {
     // The codebase treats wikilinks case-insensitively (see lint.ts
     // line 48 comment). Slugs are always lowercase, so two titles
