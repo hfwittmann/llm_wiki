@@ -47,7 +47,7 @@ function buildMiniMaxProviderConfig(config: LlmConfig) {
 const makeConfig = (overrides: Partial<LlmConfig> = {}): LlmConfig => ({
   provider: "minimax",
   apiKey: "test-key",
-  model: "MiniMax-M2.7",
+  model: "MiniMax-M3",
   ollamaUrl: "http://localhost:11434",
   customEndpoint: "",
   maxContextSize: 204800,
@@ -91,9 +91,9 @@ describe("MiniMax Provider", () => {
   })
 
   it("carries the model in the body", () => {
-    const cfg = buildMiniMaxProviderConfig(makeConfig({ model: "MiniMax-M2.7" }))
+    const cfg = buildMiniMaxProviderConfig(makeConfig({ model: "MiniMax-M3" }))
     const body = cfg.buildBody([]) as Record<string, unknown>
-    expect(body.model).toBe("MiniMax-M2.7")
+    expect(body.model).toBe("MiniMax-M3")
   })
 
   it("separates system messages from conversation (Anthropic convention)", () => {
