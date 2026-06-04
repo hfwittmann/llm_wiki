@@ -119,7 +119,7 @@ fn claude_content_blocks(content: &ClaudeContent) -> Vec<serde_json::Value> {
 /// caller can fall back to the process-level PATH.
 #[cfg(not(windows))]
 fn shell_path() -> Option<String> {
-    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string());
     // `-ilc` = interactive + login so both profile and rc files run,
     // picking up version-manager init scripts. We print a unique
     // marker so we can find our line even if the shell prints motd /
