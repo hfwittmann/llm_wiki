@@ -404,6 +404,34 @@ function buildOpenAiCompatibleBody(
     body.chat_template_kwargs = { enable_thinking: false }
   }
 
+  if (config.provider === "ollama") {
+    // Ollama's OpenAI-compatible /v1/chat/completions maps reasoning
+    // control onto `reasoning_effort` ("high"|"medium"|"low"|"none";
+    // "none" disables thinking). This is the only lever that stops a
+    // thinking-capable model — or a non-thinking one Ollama wraps with a
+    // thinking template — from spending its entire token budget on
+    // chain-of-thought and ending the stream with an empty `content`,
+    // which surfaces to the user as the "produced N chars of reasoning,
+    // but no actual response content" diagnostic. Until this, callers'
+    // `reasoning: { mode: "off" }` (every structured ingest call) was
+    // silently dropped on the Ollama path. Non-thinking models (gemma,
+    // llama) ignore the field harmlessly. "max" has no Ollama analogue,
+    // so it maps to the strongest supported level, "high".
+    // See docs.ollama.com/api/openai-compatibility.
+    if (reasoning.mode === "off") {
+      body.reasoning_effort = "none"
+    } else if (
+      reasoning.mode === "low" ||
+      reasoning.mode === "medium" ||
+      reasoning.mode === "high"
+    ) {
+      body.reasoning_effort = reasoning.mode
+    } else if (reasoning.mode === "max") {
+      body.reasoning_effort = "high"
+    }
+    return body
+  }
+
   if (config.provider === "openai" && reasoning.mode !== "auto" && reasoning.mode !== "off") {
     if (reasoning.mode === "low" || reasoning.mode === "medium" || reasoning.mode === "high") {
       body.reasoning_effort = reasoning.mode

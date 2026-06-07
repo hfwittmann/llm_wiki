@@ -533,4 +533,61 @@ describe("reasoning controls", () => {
 
     expect(body.generationConfig?.thinkingConfig).toEqual({ thinkingBudget: 0 })
   })
+
+  it("maps Ollama reasoning off to reasoning_effort none (stops thinking-runaway empty content)", () => {
+    const cfg = mkConfig({
+      provider: "ollama",
+      model: "gemma3:12b",
+      ollamaUrl: "http://localhost:11434",
+    })
+    const body = getProviderConfig(cfg).buildBody(
+      [{ role: "user", content: "hi" }],
+      { reasoning: { mode: "off" }, temperature: 0.1, max_tokens: 4096 },
+    ) as Record<string, unknown>
+
+    expect(body.reasoning_effort).toBe("none")
+  })
+
+  it("maps Ollama low/medium/high reasoning straight through to reasoning_effort", () => {
+    const cfg = mkConfig({
+      provider: "ollama",
+      model: "qwen3:8b",
+      ollamaUrl: "http://localhost:11434",
+    })
+    for (const mode of ["low", "medium", "high"] as const) {
+      const body = getProviderConfig(cfg).buildBody(
+        [{ role: "user", content: "hi" }],
+        { reasoning: { mode } },
+      ) as Record<string, unknown>
+      expect(body.reasoning_effort).toBe(mode)
+    }
+  })
+
+  it("maps Ollama reasoning max to the strongest supported level high", () => {
+    const cfg = mkConfig({
+      provider: "ollama",
+      model: "qwen3:8b",
+      ollamaUrl: "http://localhost:11434",
+    })
+    const body = getProviderConfig(cfg).buildBody(
+      [{ role: "user", content: "hi" }],
+      { reasoning: { mode: "max" } },
+    ) as Record<string, unknown>
+
+    expect(body.reasoning_effort).toBe("high")
+  })
+
+  it("leaves Ollama reasoning_effort unset on auto so the model default applies", () => {
+    const cfg = mkConfig({
+      provider: "ollama",
+      model: "gemma3:12b",
+      ollamaUrl: "http://localhost:11434",
+    })
+    const body = getProviderConfig(cfg).buildBody(
+      [{ role: "user", content: "hi" }],
+      { reasoning: { mode: "auto" } },
+    ) as Record<string, unknown>
+
+    expect(body.reasoning_effort).toBeUndefined()
+  })
 })
