@@ -414,13 +414,14 @@ LLM Wiki ships a built-in local HTTP API at `http://127.0.0.1:19828` (token-prot
 - `GET /api/v1/health` — server status (no auth)
 - `GET /api/v1/projects` — list projects
 - `GET /api/v1/projects/{id}/files` / `files/content` — read files and content
+- `GET /api/v1/projects/{id}/reviews?status=unresolved` — export Review tab items for wiki maintenance (`status`: `unresolved`, `resolved`, or `all`; optional `type` and `limit`)
 - `POST /api/v1/projects/{id}/search` — **hybrid** retrieval (keyword + vector) returning `mode`, `tokenHits`, `vectorHits`, per-result `vectorScore`
 - `GET /api/v1/projects/{id}/graph` — wikilinks graph
 - `POST /api/v1/projects/{id}/sources/rescan` — trigger a backend rescan
 
 Enable the API, generate a token, and choose whether local unauthenticated access is allowed in **Settings → API + MCP**.
 
-For MCP-compatible clients, LLM Wiki also includes a local MCP server in `mcp-server/`. After building it with `npm run mcp:build`, **Settings → API + MCP** shows a copyable MCP client configuration with the correct local path for your machine. The MCP tools call the same API surface, so agent clients can list projects, read files, run hybrid search, inspect the graph, and trigger source rescans without custom HTTP glue code.
+For MCP-compatible clients, LLM Wiki also includes a local MCP server in `mcp-server/`. After building it with `npm run mcp:build`, **Settings → API + MCP** shows a copyable MCP client configuration with the correct local path for your machine. The MCP tools call the same API surface, so agent clients can list projects, read files, export unresolved Review items, run hybrid search, inspect the graph, and trigger source rescans without custom HTTP glue code.
 
 ### Plug your AI agent in with one command
 
