@@ -143,6 +143,8 @@
     "attachImage": "Attach image",
     "removeImage": "Remove image",
     "imageMessage": "Image",
+    "imageVisionHint": "Images are sent to the current LLM. Use a vision-capable model for image questions.",
+    "imageInputUnavailable": "The current provider does not support image input. Switch to a vision-capable provider in Settings.",
     "imageTooLarge": "Image too large (max {{max}}MB): {{name}}",
     "tooManyImages": "Too many images (max {{max}})",
     "unsupportedImageType": "Unsupported image type: {{type}}"

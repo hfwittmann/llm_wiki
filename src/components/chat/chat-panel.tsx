@@ -7,6 +7,7 @@ import { ChatInput, type ChatSendOptions } from "./chat-input"
 import { useChatStore, chatMessagesToLLM, type MessageReference, type MessageImage } from "@/stores/chat-store"
 import { useWikiStore } from "@/stores/wiki-store"
 import { streamChat, type ChatMessage as LLMMessage } from "@/lib/llm-client"
+import { supportsImageInput } from "@/lib/llm-providers"
 import { executeIngestWrites } from "@/lib/ingest"
 import { listDirectory, readFile, deleteFile } from "@/commands/fs"
 import { searchWiki } from "@/lib/search"
@@ -160,6 +161,7 @@ export function ChatPanel() {
   const llmConfig = useWikiStore((s) => s.llmConfig)
   const searchApiConfig = useWikiStore((s) => s.searchApiConfig)
   const anyTxtAvailable = hasConfiguredAnyTxt(searchApiConfig.anyTxt)
+  const imageInputAvailable = supportsImageInput(llmConfig)
   const setFileTree = useWikiStore((s) => s.setFileTree)
 
   const abortRef = useRef<AbortController | null>(null)
@@ -638,6 +640,7 @@ export function ChatPanel() {
           onStop={handleStop}
           isStreaming={isStreaming}
           anyTxtAvailable={anyTxtAvailable}
+          imageInputAvailable={imageInputAvailable}
           placeholder={
             mode === "ingest"
               ? t("chat.ingestPlaceholder")

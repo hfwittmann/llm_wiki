@@ -39,6 +39,28 @@ import { normalizePath } from "@/lib/path-utils"
 
 const PASSTHROUGH_RE = /^(https?:|data:|blob:|file:|tauri:)/i
 
+function trimTrailingSlash(path: string): string {
+  return path.replace(/\/+$/, "")
+}
+
+function comparePath(path: string): string {
+  return /^[a-zA-Z]:/.test(path) ? path.toLowerCase() : path
+}
+
+function isInsideProject(path: string, projectPath: string): boolean {
+  const root = comparePath(trimTrailingSlash(normalizePath(projectPath)))
+  const candidate = comparePath(trimTrailingSlash(normalizePath(path)))
+  return candidate === root || candidate.startsWith(`${root}/`)
+}
+
+function decodePathSrc(src: string): string {
+  try {
+    return decodeURIComponent(src)
+  } catch {
+    return src
+  }
+}
+
 /**
  * Collapse `.` and `..` segments in a forward-slashed path without
  * touching the filesystem. A leading `..` that would escape the
@@ -86,9 +108,16 @@ export function resolveMarkdownImageSrc(
   const isAbsolute =
     rawSrc.startsWith("/") || /^[a-zA-Z]:/.test(rawSrc) || rawSrc.startsWith("\\\\")
 
-  // Absolute paths get fed straight to convertFileSrc — the user (or
-  // some plugin) explicitly chose that path; we don't second-guess.
-  if (isAbsolute) return convertFileSrc(rawSrc)
+  // Absolute paths are allowed only inside the current project. This resolver
+  // is used for both generated/imported markdown and normal wiki reading, so
+  // this intentionally trades off rendering arbitrary external local images
+  // for a single safe rule: markdown cannot turn into a project-external local
+  // file read through Tauri's asset server. External web URLs still pass
+  // through via PASSTHROUGH_RE above.
+  if (isAbsolute) {
+    const absolute = collapsePath(normalizePath(decodePathSrc(rawSrc)))
+    return isInsideProject(absolute, pp) ? convertFileSrc(absolute) : rawSrc
+  }
 
   // Strip a leading `./` for cleanliness; treat `media/foo.png` and
   // `./media/foo.png` identically.
@@ -106,12 +135,7 @@ export function resolveMarkdownImageSrc(
   // "%E6", finds nothing, and the image 404s (showing the alt text).
   // Decoding is wrapped because a malformed `%` sequence throws; in
   // that case we keep the raw value rather than crash the renderer.
-  let cleaned: string
-  try {
-    cleaned = decodeURIComponent(stripped)
-  } catch {
-    cleaned = stripped
-  }
+  const cleaned = decodePathSrc(stripped)
 
   // Generated-wiki convention takes precedence: ingest always emits
   // embedded images as `media/<source-slug>/img-N.png` — a path
@@ -138,7 +162,7 @@ export function resolveMarkdownImageSrc(
       dir.startsWith("/") || /^[a-zA-Z]:/.test(dir) || dir.startsWith("\\\\")
     const baseDir = dirIsAbsolute ? dir : `${pp}/${dir}`
     const absolute = collapsePath(`${baseDir.replace(/\/+$/, "")}/${cleaned}`)
-    return convertFileSrc(absolute)
+    return isInsideProject(absolute, pp) ? convertFileSrc(absolute) : rawSrc
   }
 
   // Fallback: resolve as wiki-root-relative. Image references in
@@ -146,5 +170,5 @@ export function resolveMarkdownImageSrc(
   // so the path is stable regardless of page depth, and callers
   // without a file context (chat replies) rely on it too.
   const absolute = collapsePath(`${pp}/wiki/${cleaned}`)
-  return convertFileSrc(absolute)
+  return isInsideProject(absolute, pp) ? convertFileSrc(absolute) : rawSrc
 }

@@ -301,6 +301,18 @@ function isXiaomiMimoEndpoint(config: LlmConfig): boolean {
     || /\.?xiaomimimo\.com(?::|\/|$)/i.test(config.customEndpoint)
 }
 
+function isBigModelEndpoint(config: LlmConfig): boolean {
+  return /(?:^|\/\/)open\.bigmodel\.cn(?:[:/]|$)/i.test(config.customEndpoint)
+}
+
+function isGlmVisionModel(model: string): boolean {
+  const normalized = model.trim().toLowerCase()
+  return /(?:^|[-_.])glm[-_.]5v[-_.]turbo(?:[-_.]|$)/i.test(normalized)
+    || /(?:^|[-_.])glm[-_.]4\.?6v(?:[-_.]|$)/i.test(normalized)
+    || /(?:^|[-_.])glm[-_.]4\.?5v(?:[-_.]|$)/i.test(normalized)
+    || /(?:^|[-_.])glm[-_.]4v(?:[-_.]|$)/i.test(normalized)
+}
+
 function isOpenAiStrictCompletionModel(config: LlmConfig): boolean {
   if ((config.provider === "azure" || (config.provider === "custom" && isAzureOpenAiEndpoint(config.customEndpoint)))
     && config.azureModelFamily === "gpt5") {
@@ -376,6 +388,7 @@ function buildOpenAiCompatibleBody(
   messages: ChatMessage[],
   overrides?: RequestOverrides,
 ): Record<string, unknown> {
+  assertBigModelImageSupport(config, messages)
   const reasoning = effectiveReasoning(config, overrides)
   const body: Record<string, unknown> = buildOpenAiBody(messages, stripWireAgnosticOverrides(overrides))
   adaptOpenAiStrictCompletionBody(config, body)
@@ -556,6 +569,12 @@ function buildAnthropicBodyWithReasoning(
   return body
 }
 
+function hasImageContent(messages: ChatMessage[]): boolean {
+  return messages.some((m) =>
+    Array.isArray(m.content) && m.content.some((block) => block.type === "image"),
+  )
+}
+
 /**
  * Some Anthropic-compatible third-party endpoints (MiniMax global + CN)
  * serve the Messages API but authenticate with `Authorization: Bearer`
@@ -592,6 +611,73 @@ function requiresBearerAuth(url: string): boolean {
   )
 }
 
+function isMiniMaxAnthropicHost(url: string): boolean {
+  try {
+    const parsed = new URL(url)
+    return parsed.hostname === "api.minimax.io" || parsed.hostname === "api.minimaxi.com"
+  } catch {
+    return false
+  }
+}
+
+function normalizeMiniMaxAnthropicBase(base: string): string {
+  if (!isMiniMaxAnthropicHost(base)) return base
+
+  try {
+    const parsed = new URL(base)
+    const path = parsed.pathname.replace(/\/+$/, "")
+    if (path === "" || path === "/" || /^\/v\d+(?:\/messages)?$/i.test(path)) {
+      parsed.pathname = "/anthropic"
+      parsed.search = ""
+      parsed.hash = ""
+      return parsed.toString().replace(/\/+$/, "")
+    }
+  } catch {
+    return base
+  }
+
+  return base
+}
+
+function isOfficialMiniMaxAnthropicUrl(url: string): boolean {
+  if (!isMiniMaxAnthropicHost(url)) return false
+  try {
+    const parsed = new URL(url)
+    return /^\/anthropic(?:\/|$)/i.test(parsed.pathname)
+  } catch {
+    return false
+  }
+}
+
+function isMiniMaxM3Model(model: string): boolean {
+  return /^minimax-m3(?:[-_.]|$)/i.test(model.trim())
+}
+
+function assertMiniMaxImageSupport(url: string, model: string, messages: ChatMessage[]): void {
+  if (!isOfficialMiniMaxAnthropicUrl(url) || !hasImageContent(messages) || isMiniMaxM3Model(model)) return
+  throw new Error(
+    "MiniMax image input is supported only by MiniMax-M3 on the official Anthropic-compatible endpoint. Switch the model to MiniMax-M3 or use another vision-capable provider.",
+  )
+}
+
+function assertBigModelImageSupport(config: LlmConfig, messages: ChatMessage[]): void {
+  if (!isBigModelEndpoint(config) || !hasImageContent(messages) || isGlmVisionModel(config.model)) return
+  throw new Error(
+    "Zhipu BigModel image input is supported only by GLM vision models. Switch to glm-5v-turbo, glm-4.6v, glm-4.5v, or glm-4v-plus.",
+  )
+}
+
+export function supportsImageInput(config: LlmConfig): boolean {
+  if (config.provider === "codex-cli") return false
+  if (config.provider === "minimax") return isMiniMaxM3Model(config.model)
+  if (isBigModelEndpoint(config)) return isGlmVisionModel(config.model)
+  if ((config.provider === "custom") && (config.apiMode ?? "chat_completions") === "anthropic_messages") {
+    const url = buildAnthropicUrl(config.customEndpoint)
+    return !isOfficialMiniMaxAnthropicUrl(url) || isMiniMaxM3Model(config.model)
+  }
+  return true
+}
+
 /**
  * Build the final POST URL for an Anthropic-wire endpoint given whatever
  * base the user provided. Handles every shape we've seen in the wild:
@@ -606,7 +692,7 @@ function requiresBearerAuth(url: string): boolean {
  * ".../v1/v1/messages" (404) whenever a user typed a URL ending in /v1.
  */
 export function buildAnthropicUrl(base: string): string {
-  const trimmed = base.replace(/\/+$/, "")
+  const trimmed = normalizeMiniMaxAnthropicBase(base).replace(/\/+$/, "")
   if (/\/v\d+\/messages$/i.test(trimmed)) return trimmed
   if (/\/v\d+$/i.test(trimmed)) return `${trimmed}/messages`
   return `${trimmed}/v1/messages`
@@ -735,10 +821,13 @@ export function getProviderConfig(config: LlmConfig): ProviderConfig {
       return {
         url,
         headers: buildAnthropicHeaders(apiKey, url),
-        buildBody: (messages, overrides) => ({
-          ...buildAnthropicBodyWithReasoning(config, messages, overrides),
-          model,
-        }),
+        buildBody: (messages, overrides) => {
+          assertMiniMaxImageSupport(url, model, messages)
+          return {
+            ...buildAnthropicBodyWithReasoning(config, messages, overrides),
+            model,
+          }
+        },
         parseStream: parseAnthropicLine,
       }
     }
@@ -815,10 +904,13 @@ export function getProviderConfig(config: LlmConfig): ProviderConfig {
       return {
         url,
         headers: buildAnthropicHeaders(apiKey, url),
-        buildBody: (messages, overrides) => ({
-          ...buildAnthropicBodyWithReasoning(config, messages, overrides),
-          model,
-        }),
+        buildBody: (messages, overrides) => {
+          assertMiniMaxImageSupport(url, model, messages)
+          return {
+            ...buildAnthropicBodyWithReasoning(config, messages, overrides),
+            model,
+          }
+        },
         parseStream: parseAnthropicLine,
       }
     }
@@ -844,10 +936,13 @@ export function getProviderConfig(config: LlmConfig): ProviderConfig {
         return {
           url,
           headers: buildAnthropicHeaders(apiKey, url),
-          buildBody: (messages, overrides) => ({
-            ...buildAnthropicBodyWithReasoning(config, messages, overrides),
-            model,
-          }),
+          buildBody: (messages, overrides) => {
+            assertMiniMaxImageSupport(url, model, messages)
+            return {
+              ...buildAnthropicBodyWithReasoning(config, messages, overrides),
+              model,
+            }
+          },
           parseStream: parseAnthropicLine,
         }
       }

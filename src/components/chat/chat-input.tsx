@@ -24,10 +24,18 @@ interface ChatInputProps {
   onStop: () => void
   isStreaming: boolean
   anyTxtAvailable?: boolean
+  imageInputAvailable?: boolean
   placeholder?: string
 }
 
-export function ChatInput({ onSend, onStop, isStreaming, anyTxtAvailable = true, placeholder }: ChatInputProps) {
+export function ChatInput({
+  onSend,
+  onStop,
+  isStreaming,
+  anyTxtAvailable = true,
+  imageInputAvailable = true,
+  placeholder,
+}: ChatInputProps) {
   const { t } = useTranslation()
   const [value, setValue] = useState("")
   const [useWebSearch, setUseWebSearch] = useState(false)
@@ -49,6 +57,10 @@ export function ChatInput({ onSend, onStop, isStreaming, anyTxtAvailable = true,
     async (files: File[]) => {
       const imageFiles = files.filter((f) => f.type.startsWith("image/"))
       if (imageFiles.length === 0) return
+      if (!imageInputAvailable) {
+        setImageError(t("chat.imageInputUnavailable"))
+        return
+      }
       let error: string | null = null
       const accepted: MessageImage[] = []
       // Read current count via the functional updater below; here we
@@ -79,7 +91,7 @@ export function ChatInput({ onSend, onStop, isStreaming, anyTxtAvailable = true,
       }
       setImageError(error)
     },
-    [images.length, t],
+    [imageInputAvailable, images.length, t],
   )
 
   const handlePaste = useCallback(
@@ -129,6 +141,10 @@ export function ChatInput({ onSend, onStop, isStreaming, anyTxtAvailable = true,
     const trimmed = value.trim()
     // Allow image-only messages: send if there's text OR at least one image.
     if ((!trimmed && images.length === 0) || isStreaming) return
+    if (images.length > 0 && !imageInputAvailable) {
+      setImageError(t("chat.imageInputUnavailable"))
+      return
+    }
     onSend(trimmed, images, { useWebSearch, useAnyTxtSearch })
     setValue("")
     setImages([])
@@ -136,7 +152,7 @@ export function ChatInput({ onSend, onStop, isStreaming, anyTxtAvailable = true,
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto"
     }
-  }, [value, images, isStreaming, onSend, useWebSearch, useAnyTxtSearch])
+  }, [imageInputAvailable, images, isStreaming, onSend, t, useAnyTxtSearch, useWebSearch, value])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -187,6 +203,11 @@ export function ChatInput({ onSend, onStop, isStreaming, anyTxtAvailable = true,
         {imageError && (
           <p className="mb-1 px-1 text-xs text-destructive">{imageError}</p>
         )}
+        {images.length > 0 && !imageError && (
+          <p className="mb-1 px-1 text-xs text-muted-foreground">
+            {t("chat.imageVisionHint")}
+          </p>
+        )}
         <textarea
           ref={textareaRef}
           value={value}
@@ -210,16 +231,20 @@ export function ChatInput({ onSend, onStop, isStreaming, anyTxtAvailable = true,
         />
         <div className="mt-1 flex items-center justify-between gap-3 border-t border-border/50 pt-2">
           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isStreaming || images.length >= MAX_IMAGES_PER_MESSAGE}
-              className={searchToggleClass(false)}
-              title={t("chat.attachImage")}
+            <span
+              className="inline-flex"
+              title={!imageInputAvailable ? t("chat.imageInputUnavailable") : t("chat.attachImage")}
             >
-              <ImagePlus className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">{t("chat.attachImage")}</span>
-            </button>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isStreaming || !imageInputAvailable || images.length >= MAX_IMAGES_PER_MESSAGE}
+                className={searchToggleClass(false)}
+              >
+                <ImagePlus className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">{t("chat.attachImage")}</span>
+              </button>
+            </span>
             <button
               type="button"
               aria-pressed={useWebSearch}

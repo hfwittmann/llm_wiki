@@ -143,6 +143,8 @@
     "attachImage": "添加图片",
     "removeImage": "移除图片",
     "imageMessage": "图片",
+    "imageVisionHint": "图片会发送给当前 LLM。图片提问需要使用支持视觉的模型。",
+    "imageInputUnavailable": "当前 Provider 不支持图片输入。请在设置中切换到支持视觉的 Provider。",
     "imageTooLarge": "图片过大（最大 {{max}}MB）：{{name}}",
     "tooManyImages": "图片数量过多（最多 {{max}} 张）",
     "unsupportedImageType": "不支持的图片类型：{{type}}"
