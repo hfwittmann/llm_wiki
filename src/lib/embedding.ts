@@ -325,6 +325,12 @@ async function vectorCountChunks(projectPath: string): Promise<number> {
   })
 }
 
+async function vectorClearChunks(projectPath: string): Promise<void> {
+  await invoke("vector_clear_chunks", {
+    projectPath: normalizePath(projectPath),
+  })
+}
+
 export async function legacyVectorRowCount(projectPath: string): Promise<number> {
   try {
     return await invoke("vector_legacy_row_count", {
@@ -339,6 +345,10 @@ export async function dropLegacyVectorTable(projectPath: string): Promise<void> 
   await invoke("vector_drop_legacy", {
     projectPath: normalizePath(projectPath),
   })
+}
+
+export async function clearChunkVectorTable(projectPath: string): Promise<void> {
+  await vectorClearChunks(projectPath)
 }
 
 // ── Chunk enrichment ─────────────────────────────────────────────────────
@@ -361,30 +371,36 @@ function enrichChunkForEmbedding(
   return parts.join("\n\n")
 }
 
-// ── Public API: embedPage / embedAllPages / searchByEmbedding ────────────
+interface PreparedPageEmbedding {
+  pageId: string
+  rows: ChunkUpsertInput[]
+  chunkCount: number
+  failedChunks: number
+}
 
-/**
- * Embed a wiki page: chunk → per-chunk embed → replace the page's
- * vectors in LanceDB in one batch. Every transient failure leaves the
- * existing v2 rows intact (empty upsert is a no-op Rust-side).
- *
- * Called by ingest.ts after writing a page to disk.
- */
-export async function embedPage(
-  projectPath: string,
+type PageEmbeddingPreparation =
+  | { status: "ready"; page: PreparedPageEmbedding }
+  | { status: "empty" }
+  | { status: "failed"; reason: string }
+
+function extractEmbeddingTitle(content: string, fallbackId: string): string {
+  const titleMatch = content.match(/^---\n[\s\S]*?^title:\s*["']?(.+?)["']?\s*$/m)
+  return titleMatch ? titleMatch[1].trim() : fallbackId
+}
+
+async function preparePageEmbeddingRows(
   pageId: string,
   title: string,
   content: string,
   cfg: EmbeddingConfig,
-): Promise<void> {
-  if (!cfg.enabled || !cfg.model) return
+): Promise<PageEmbeddingPreparation> {
+  if (!cfg.enabled || !cfg.model) return { status: "empty" }
 
-  const t0 = performance.now()
   const chunks = chunkMarkdown(content, {
     targetChars: cfg.maxChunkChars ?? 1000,
     overlapChars: cfg.overlapChunkChars ?? 200,
   })
-  if (chunks.length === 0) return
+  if (chunks.length === 0) return { status: "empty" }
 
   const rows: ChunkUpsertInput[] = []
   let failedChunks = 0
@@ -404,17 +420,56 @@ export async function embedPage(
   }
 
   if (rows.length === 0) {
-    console.log(
-      `[Embedding] Indexed nothing for "${pageId}" — all ${chunks.length} chunks failed. See getLastEmbeddingError().`,
-    )
-    return
+    return {
+      status: "failed",
+      reason: getLastEmbeddingError() || "all chunks failed to embed",
+    }
+  }
+  return {
+    status: "ready",
+    page: {
+      pageId,
+      rows,
+      chunkCount: chunks.length,
+      failedChunks,
+    },
+  }
+}
+
+// ── Public API: embedPage / embedAllPages / searchByEmbedding ────────────
+
+/**
+ * Embed a wiki page: chunk → per-chunk embed → replace the page's
+ * vectors in LanceDB in one batch. Every transient failure leaves the
+ * existing v2 rows intact (empty upsert is a no-op Rust-side).
+ *
+ * Called by ingest.ts after writing a page to disk.
+ */
+export async function embedPage(
+  projectPath: string,
+  pageId: string,
+  title: string,
+  content: string,
+  cfg: EmbeddingConfig,
+): Promise<boolean> {
+  const t0 = performance.now()
+  const prepared = await preparePageEmbeddingRows(pageId, title, content, cfg)
+
+  if (prepared.status !== "ready") {
+    if (prepared.status === "failed") {
+      console.log(
+        `[Embedding] Indexed nothing for "${pageId}" — no chunks could be embedded. See getLastEmbeddingError().`,
+      )
+    }
+    return false
   }
 
-  await vectorUpsertChunks(projectPath, pageId, rows)
+  await vectorUpsertChunks(projectPath, pageId, prepared.page.rows)
   const elapsed = Math.round(performance.now() - t0)
   console.log(
-    `[Embedding] Indexed "${pageId}": ${rows.length}/${chunks.length} chunks (${failedChunks} skipped) in ${elapsed}ms`,
+    `[Embedding] Indexed "${pageId}": ${prepared.page.rows.length}/${prepared.page.chunkCount} chunks (${prepared.page.failedChunks} skipped) in ${elapsed}ms`,
   )
+  return true
 }
 
 /**
@@ -427,8 +482,10 @@ export async function embedAllPages(
   projectPath: string,
   cfg: EmbeddingConfig,
   onProgress?: (done: number, total: number) => void,
+  options?: { clearExisting?: boolean },
 ): Promise<number> {
   if (!cfg.enabled || !cfg.model) return 0
+  lastEmbeddingError = null
 
   const pp = normalizePath(projectPath)
 
@@ -436,6 +493,9 @@ export async function embedAllPages(
   try {
     tree = await listDirectory(`${pp}/wiki`)
   } catch {
+    if (options?.clearExisting) {
+      throw new Error("Could not read wiki tree; existing index was left unchanged.")
+    }
     return 0
   }
 
@@ -454,13 +514,90 @@ export async function embedAllPages(
   }
   walk(tree)
 
+  if (options?.clearExisting) {
+    if (mdFiles.length === 0) {
+      const existingChunks = await vectorCountChunks(pp).catch(() => 0)
+      if (existingChunks > 0) {
+        throw new Error(
+          `Wiki tree returned no content pages, but ${existingChunks} chunks are currently indexed. Existing index was left unchanged.`,
+        )
+      }
+      await clearChunkVectorTable(pp)
+      return 0
+    }
+
+    const preparedPages: PreparedPageEmbedding[] = []
+    const failures: string[] = []
+    let attempted = 0
+    for (const file of mdFiles) {
+      try {
+        const content = await readFile(file.path)
+        const title = extractEmbeddingTitle(content, file.id)
+        const prepared = await preparePageEmbeddingRows(file.id, title, content, cfg)
+        if (prepared.status === "ready") {
+          if (prepared.page.failedChunks > 0) {
+            const reason = getLastEmbeddingError()
+            failures.push(
+              `${file.id}: ${prepared.page.failedChunks} of ${prepared.page.chunkCount} chunks failed to embed${reason ? ` (${reason})` : ""}`,
+            )
+          } else {
+            preparedPages.push(prepared.page)
+          }
+        } else if (prepared.status === "failed") {
+          failures.push(`${file.id}: ${prepared.reason}`)
+        }
+      } catch (err) {
+        failures.push(`${file.id}: ${err instanceof Error ? err.message : String(err)}`)
+      }
+      attempted++
+      if (onProgress) onProgress(attempted, mdFiles.length)
+    }
+
+    if (failures.length > 0) {
+      throw new Error(
+        `${failures.length} of ${mdFiles.length} pages could not be embedded (${failures[0]}). Existing index was left unchanged.`,
+      )
+    }
+
+    if (preparedPages.length === 0) {
+      const existingChunks = await vectorCountChunks(pp).catch(() => 0)
+      if (existingChunks > 0) {
+        throw new Error(
+          `Wiki tree has only empty content pages, but ${existingChunks} chunks are currently indexed. Existing index was left unchanged.`,
+        )
+      }
+    }
+
+    await clearChunkVectorTable(pp)
+
+    let written = 0
+    for (const page of preparedPages) {
+      try {
+        await vectorUpsertChunks(pp, page.pageId, page.rows)
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err)
+        throw new Error(
+          `Rebuild write failed after clearing existing chunks (${page.pageId}: ${reason}). The rebuilt index may be incomplete; run re-index again after fixing the error.`,
+        )
+      }
+      written++
+      console.log(
+        `[Embedding] Rebuilt "${page.pageId}": ${page.rows.length}/${page.chunkCount} chunks (${page.failedChunks} skipped)`,
+      )
+    }
+
+    return written
+  }
+
   let done = 0
+  let indexed = 0
   for (const file of mdFiles) {
     try {
       const content = await readFile(file.path)
-      const titleMatch = content.match(/^---\n[\s\S]*?^title:\s*["']?(.+?)["']?\s*$/m)
-      const title = titleMatch ? titleMatch[1].trim() : file.id
-      await embedPage(pp, file.id, title, content, cfg)
+      const title = extractEmbeddingTitle(content, file.id)
+      if (await embedPage(pp, file.id, title, content, cfg)) {
+        indexed++
+      }
     } catch {
       // skip — individual file failure doesn't halt the batch
     }
@@ -468,7 +605,7 @@ export async function embedAllPages(
     if (onProgress) onProgress(done, mdFiles.length)
   }
 
-  return done
+  return indexed
 }
 
 /**

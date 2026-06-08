@@ -332,6 +332,7 @@
         "reindexAll": "Re-index all pages",
         "reindexing": "Indexing {{done}}/{{total}}…",
         "reindexDone": "Indexed {{count}} pages.",
+        "reindexError": "Re-index failed: {{message}}",
         "legacyPromptTitle": "Legacy per-page index detected",
         "legacyPromptBody": "Your project has {{count}} entries in the old per-page vector store. The new per-chunk index gives better retrieval but needs a one-time re-embed. Run \"Re-index all pages\" to upgrade.",
         "dropLegacy": "Drop legacy index",

@@ -1090,6 +1090,224 @@ describe("embedAllPages", () => {
     expect(pageIds).toEqual(["attention", "rope"])
   })
 
+  it("clears the chunk table before a forced rebuild", async () => {
+    listDirectoryMock.mockResolvedValueOnce(makeTree())
+    readFileMock.mockResolvedValue("# Title\n\nBody.")
+    mockHttpFetch.mockImplementation(async () => okResponse([0.5]))
+
+    const count = await embedAllPages(
+      "/proj",
+      cfg,
+      undefined,
+      { clearExisting: true },
+    )
+
+    expect(count).toBe(2)
+    const commands = mockInvoke.mock.calls.map((call) => call[0])
+    expect(commands[0]).toBe("vector_clear_chunks")
+    expect(commands.filter((cmd) => cmd === "vector_upsert_chunks")).toHaveLength(2)
+  })
+
+  it("does not clear the chunk table during ordinary embedAllPages runs", async () => {
+    listDirectoryMock.mockResolvedValueOnce(makeTree())
+    readFileMock.mockResolvedValue("# Title\n\nBody.")
+    mockHttpFetch.mockImplementation(async () => okResponse([0.5]))
+
+    await embedAllPages("/proj", cfg)
+
+    expect(mockInvoke.mock.calls.map((call) => call[0])).not.toContain("vector_clear_chunks")
+  })
+
+  it("does not clear existing chunks when forced rebuild cannot embed every page", async () => {
+    listDirectoryMock.mockResolvedValueOnce([
+      { name: "a.md", path: "/proj/wiki/a.md", is_dir: false },
+      { name: "b.md", path: "/proj/wiki/b.md", is_dir: false },
+    ])
+    readFileMock.mockResolvedValue("# Title\n\nBody.")
+    mockHttpFetch
+      .mockResolvedValueOnce(okResponse([0.5]))
+      .mockResolvedValueOnce(genericErrorResponse(500, "embedding server down"))
+
+    let message = ""
+    try {
+      await embedAllPages(
+        "/proj",
+        cfg,
+        undefined,
+        { clearExisting: true },
+      )
+    } catch (err) {
+      message = err instanceof Error ? err.message : String(err)
+    }
+    expect(message).toContain("1 of 2 pages could not be embedded")
+    expect(message).not.toContain("Re-index failed: Re-index failed")
+
+    expect(mockInvoke.mock.calls.map((call) => call[0])).not.toContain("vector_clear_chunks")
+    expect(mockInvoke.mock.calls.map((call) => call[0])).not.toContain("vector_upsert_chunks")
+  })
+
+  it("does not clear existing chunks when forced rebuild cannot embed any page", async () => {
+    listDirectoryMock.mockResolvedValueOnce(makeTree())
+    readFileMock.mockResolvedValue("# Title\n\nBody.")
+    mockHttpFetch.mockResolvedValue(genericErrorResponse(500, "embedding server down"))
+
+    await expect(embedAllPages(
+      "/proj",
+      cfg,
+      undefined,
+      { clearExisting: true },
+    )).rejects.toThrow("2 of 2 pages could not be embedded")
+
+    expect(mockInvoke.mock.calls.map((call) => call[0])).not.toContain("vector_clear_chunks")
+    expect(mockInvoke.mock.calls.map((call) => call[0])).not.toContain("vector_upsert_chunks")
+  })
+
+  it("skips empty content pages during forced rebuild without treating them as failures", async () => {
+    listDirectoryMock.mockResolvedValueOnce([
+      { name: "empty.md", path: "/proj/wiki/empty.md", is_dir: false },
+      { name: "body.md", path: "/proj/wiki/body.md", is_dir: false },
+    ])
+    readFileMock
+      .mockResolvedValueOnce("---\ntitle: Empty Stub\n---\n")
+      .mockResolvedValueOnce("# Body\n\nThis page has content.")
+    mockHttpFetch.mockImplementation(async () => okResponse([0.5]))
+
+    const count = await embedAllPages(
+      "/proj",
+      cfg,
+      undefined,
+      { clearExisting: true },
+    )
+
+    expect(count).toBe(1)
+    const commands = mockInvoke.mock.calls.map((call) => call[0])
+    expect(commands[0]).toBe("vector_clear_chunks")
+    const upserts = mockInvoke.mock.calls.filter((call) => call[0] === "vector_upsert_chunks")
+    expect(upserts).toHaveLength(1)
+    expect((upserts[0][1] as { pageId: string }).pageId).toBe("body")
+  })
+
+  it("does not clear existing chunks when a forced rebuild page only embeds partially", async () => {
+    listDirectoryMock.mockResolvedValueOnce([
+      { name: "partial.md", path: "/proj/wiki/partial.md", is_dir: false },
+    ])
+    readFileMock.mockResolvedValueOnce(`${"First chunk body. ".repeat(20)}\n\n${"Second chunk body. ".repeat(20)}`)
+    const smallChunks = { ...cfg, maxChunkChars: 220, overlapChunkChars: 0 }
+    mockHttpFetch
+      .mockResolvedValueOnce(okResponse([0.5]))
+      .mockResolvedValueOnce(genericErrorResponse(500, "embedding server down"))
+
+    let message = ""
+    try {
+      await embedAllPages(
+        "/proj",
+        smallChunks,
+        undefined,
+        { clearExisting: true },
+      )
+    } catch (err) {
+      message = err instanceof Error ? err.message : String(err)
+    }
+    expect(message).toContain("chunks failed to embed")
+    expect(message).toContain("Check endpoint URL")
+
+    const commands = mockInvoke.mock.calls.map((call) => call[0])
+    expect(commands).not.toContain("vector_clear_chunks")
+    expect(commands).not.toContain("vector_upsert_chunks")
+  })
+
+  it("surfaces an incomplete-index warning when forced rebuild write fails after clearing", async () => {
+    listDirectoryMock.mockResolvedValueOnce([
+      { name: "a.md", path: "/proj/wiki/a.md", is_dir: false },
+      { name: "b.md", path: "/proj/wiki/b.md", is_dir: false },
+    ])
+    readFileMock.mockResolvedValue("# Title\n\nBody.")
+    mockHttpFetch.mockImplementation(async () => okResponse([0.5]))
+    let upsertCount = 0
+    mockInvoke.mockImplementation(async (command) => {
+      if (command === "vector_upsert_chunks") {
+        upsertCount++
+        if (upsertCount === 2) throw new Error("lancedb write failed")
+      }
+      return undefined
+    })
+
+    await expect(embedAllPages(
+      "/proj",
+      cfg,
+      undefined,
+      { clearExisting: true },
+    )).rejects.toThrow("rebuilt index may be incomplete")
+
+    const commands = mockInvoke.mock.calls.map((call) => call[0])
+    expect(commands[0]).toBe("vector_clear_chunks")
+    expect(commands.filter((command) => command === "vector_upsert_chunks")).toHaveLength(2)
+  })
+
+  it("clears stale chunks when forced rebuild has no content pages in a readable wiki tree", async () => {
+    listDirectoryMock.mockResolvedValueOnce([
+      { name: "index.md", path: "/proj/wiki/index.md", is_dir: false },
+      { name: "log.md", path: "/proj/wiki/log.md", is_dir: false },
+    ])
+    mockInvoke.mockImplementation(async (command) => {
+      if (command === "vector_count_chunks") return 0
+      return undefined
+    })
+
+    const out = await embedAllPages(
+      "/proj",
+      cfg,
+      undefined,
+      { clearExisting: true },
+    )
+
+    expect(out).toBe(0)
+    expect(mockInvoke.mock.calls.map((call) => call[0])).toContain("vector_clear_chunks")
+    expect(mockHttpFetch).not.toHaveBeenCalled()
+  })
+
+  it("does not clear existing chunks when all content pages are empty", async () => {
+    listDirectoryMock.mockResolvedValueOnce([
+      { name: "empty.md", path: "/proj/wiki/empty.md", is_dir: false },
+    ])
+    readFileMock.mockResolvedValueOnce("---\ntitle: Empty Stub\n---\n")
+    mockInvoke.mockImplementation(async (command) => {
+      if (command === "vector_count_chunks") return 5
+      return undefined
+    })
+
+    await expect(embedAllPages(
+      "/proj",
+      cfg,
+      undefined,
+      { clearExisting: true },
+    )).rejects.toThrow("Existing index was left unchanged")
+
+    const commands = mockInvoke.mock.calls.map((call) => call[0])
+    expect(commands).toContain("vector_count_chunks")
+    expect(commands).not.toContain("vector_clear_chunks")
+    expect(mockHttpFetch).not.toHaveBeenCalled()
+  })
+
+  it("does not clear existing chunks when a readable wiki tree unexpectedly has no content pages", async () => {
+    listDirectoryMock.mockResolvedValueOnce([])
+    mockInvoke.mockImplementation(async (command) => {
+      if (command === "vector_count_chunks") return 7
+      return undefined
+    })
+
+    await expect(embedAllPages(
+      "/proj",
+      cfg,
+      undefined,
+      { clearExisting: true },
+    )).rejects.toThrow("Existing index was left unchanged")
+
+    const commands = mockInvoke.mock.calls.map((call) => call[0])
+    expect(commands).toContain("vector_count_chunks")
+    expect(commands).not.toContain("vector_clear_chunks")
+  })
+
   it("extracts the title from YAML frontmatter when present", async () => {
     listDirectoryMock.mockResolvedValueOnce([
       { name: "rope.md", path: "/proj/wiki/rope.md", is_dir: false },
@@ -1142,6 +1360,19 @@ describe("embedAllPages", () => {
     expect(out).toBe(0)
   })
 
+  it("does not clear existing chunks when forced rebuild cannot read the wiki tree", async () => {
+    listDirectoryMock.mockRejectedValueOnce(new Error("ENOENT: no such file"))
+
+    await expect(embedAllPages(
+      "/proj",
+      cfg,
+      undefined,
+      { clearExisting: true },
+    )).rejects.toThrow("Could not read wiki tree")
+
+    expect(mockInvoke.mock.calls.map((call) => call[0])).not.toContain("vector_clear_chunks")
+  })
+
   it("continues with remaining files when one file's readFile throws", async () => {
     listDirectoryMock.mockResolvedValueOnce([
       { name: "a.md", path: "/proj/wiki/a.md", is_dir: false },
@@ -1154,8 +1385,7 @@ describe("embedAllPages", () => {
     mockHttpFetch.mockImplementation(async () => okResponse([0.5]))
 
     const count = await embedAllPages("/proj", cfg)
-    // `done` is incremented for every file attempted, even if embed fails.
-    expect(count).toBe(2)
+    expect(count).toBe(1)
     const upserts = mockInvoke.mock.calls.filter((c) => c[0] === "vector_upsert_chunks")
     expect(upserts).toHaveLength(1)
     expect((upserts[0][1] as { pageId: string }).pageId).toBe("b")
