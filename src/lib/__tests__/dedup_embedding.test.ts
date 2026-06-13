@@ -1,15 +1,15 @@
 /**
  * dedup_embedding.test.ts — unit tests for #359 prefilter (R4)
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi } from "vitest"
 import {
   candidatePairs,
   clusterByPairs,
   cosineSimilarity,
   pageToEmbeddingText,
   type Page,
-} from '../dedup_embedding';
-import type { EmbeddingConfig } from '@/stores/wiki-store';
+} from "../dedup_embedding"
+import type { EmbeddingConfig } from "@/stores/wiki-store"
 
 // Mock fetchEmbedding to produce realistic, sparse vectors.
 // Strategy: numeric id suffix → topic axis (mod dim). Pages with same
@@ -17,52 +17,52 @@ import type { EmbeddingConfig } from '@/stores/wiki-store';
 // consecutive ids (p0, p1, p2, ...) land on consecutive axes → low mutual
 // similarity. This mirrors real-world embeddings where distinct topics
 // have distinct dominant axes.
-vi.mock('../embedding', () => ({
+vi.mock("../embedding", () => ({
   fetchEmbedding: vi.fn(async (text: string) => {
-    const dim = 64;
-    const v = new Array(dim).fill(0);
+    const dim = 64
+    const v = new Array(dim).fill(0)
     // Extract numeric portion from the input text (pageId is first line)
-    const idLine = text.split('\n')[0] ?? '';
-    const numMatch = idLine.match(/\d+/);
-    const num = numMatch ? parseInt(numMatch[0], 10) : 0;
-    const topicAxis = num % dim;
-    v[topicAxis] = 1.0;
-    v[(topicAxis + 1) % dim] = 0.05;
-    v[(topicAxis - 1 + dim) % dim] = 0.03;
-    return v;
+    const idLine = text.split("\n")[0] ?? ""
+    const numMatch = idLine.match(/\d+/)
+    const num = numMatch ? parseInt(numMatch[0], 10) : 0
+    const topicAxis = num % dim
+    v[topicAxis] = 1.0
+    v[(topicAxis + 1) % dim] = 0.05
+    v[(topicAxis - 1 + dim) % dim] = 0.03
+    return v
   }),
-}));
+}))
 
 const testCfg: EmbeddingConfig = {
   enabled: true,
-  endpoint: 'http://localhost:0/v1/embeddings',
-  apiKey: 'mock-key',
-  model: 'mock-embedder',
-};
+  endpoint: "http://localhost:0/v1/embeddings",
+  apiKey: "mock-key",
+  model: "mock-embedder",
+}
 
-const page = (id: string, title: string, body = ''): Page => ({
+const page = (id: string, title: string, body = ""): Page => ({
   id, title, body, tags: [],
-});
+})
 
 describe('pageToEmbeddingText', () => {
   it('concatenates title + tags + body', () => {
     const text = pageToEmbeddingText({
-      id: 'p1', title: 'Foo', body: 'bar baz', tags: ['a', 'b'],
-    });
-    expect(text).toBe('Foo\na b\nbar baz');
-  });
+      id: "p1", title: "Foo", body: "bar baz", tags: ["a", "b"],
+    })
+    expect(text).toBe("p1\nFoo\na b\nbar baz")
+  })
 
   it('truncates body at budget', () => {
-    const longBody = 'x'.repeat(2000);
-    const text = pageToEmbeddingText({ id: 'p2', title: 'T', body: longBody }, 100);
-    expect(text.length).toBeLessThan(120);
-    expect(text).toContain('x'.repeat(100));
-  });
+    const longBody = "x".repeat(2000)
+    const text = pageToEmbeddingText({ id: "p2", title: "T", body: longBody }, 100)
+    expect(text.length).toBeLessThan(120)
+    expect(text).toContain("x".repeat(100))
+  })
 
   it('handles empty tags and body', () => {
-    expect(pageToEmbeddingText({ id: 'p3', title: 'Solo' })).toBe('Solo');
-  });
-});
+    expect(pageToEmbeddingText({ id: "p3", title: "Solo" })).toBe("p3\nSolo")
+  })
+})
 
 describe('cosineSimilarity', () => {
   it('returns 1 for identical vectors', () => {
@@ -150,12 +150,66 @@ describe('candidatePairs', () => {
       page('p4', 'D'),
     ];
     // p3 and p4 both have id-axes → high sim → should pair
-    const pairs = await candidatePairs(pages, testCfg, { threshold: 0.5 });
+    const pairs = await candidatePairs(pages, testCfg, {
+      minSuccessRatio: 0.5,
+      threshold: 0.5,
+    });
     // null embeddings: p1 and p2 won't contribute as SOURCE; may still appear as TARGET
     // but no pairs should reference them since no other page has a vector to compare
     expect(pairs.every(([a, b]) => a !== 'p1' && b !== 'p1' && a !== 'p2' && b !== 'p2')).toBe(true);
     // restore
     (fetchEmbedding as any).mockImplementation(origFetch);
+  });
+
+  it("throws when too few pages embed successfully", async () => {
+    const { fetchEmbedding } = await import("../embedding");
+    const origFetch = (fetchEmbedding as any).getMockImplementation();
+    (fetchEmbedding as any).mockImplementation(async () => null);
+
+    await expect(
+      candidatePairs(
+        [page("p1", "A"), page("p2", "B"), page("p3", "C")],
+        testCfg,
+      ),
+    ).rejects.toThrow(/could not embed enough pages|embedded only/i);
+
+    (fetchEmbedding as any).mockImplementation(origFetch);
+  });
+
+  it("throws when most pages fail to embed", async () => {
+    const { fetchEmbedding } = await import("../embedding");
+    const origFetch = (fetchEmbedding as any).getMockImplementation();
+    (fetchEmbedding as any)
+      .mockImplementationOnce(async () => [1, 0])
+      .mockImplementationOnce(async () => [1, 0])
+      .mockImplementation(async () => null);
+
+    await expect(
+      candidatePairs(
+        [
+          page("p1", "A"),
+          page("p2", "B"),
+          page("p3", "C"),
+          page("p4", "D"),
+        ],
+        testCfg,
+      ),
+    ).rejects.toThrow(/embedded only 2\/4/i);
+
+    (fetchEmbedding as any).mockImplementation(origFetch);
+  });
+
+  it("honors an already-aborted signal before embedding work starts", async () => {
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(
+      candidatePairs(
+        [page("p1", "A"), page("p2", "B")],
+        testCfg,
+        { signal: controller.signal },
+      ),
+    ).rejects.toThrow(/cancelled/i);
   });
 });
 
