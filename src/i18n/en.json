@@ -539,7 +539,10 @@
         "themeLight": "Light",
         "themeDark": "Dark",
         "themeSystem": "System",
-        "zoom": "Zoom"
+        "zoom": "Interface zoom",
+        "zoomHint": "Scales text and rem-based spacing across the app. Some fixed pixel panels keep their practical size limits.",
+        "zoomIn": "Zoom in",
+        "zoomOut": "Zoom out"
       },
       "maintenance": {
         "title": "Maintenance",

@@ -7,6 +7,7 @@ import { useWikiStore } from "@/stores/wiki-store"
 import { useReviewStore } from "@/stores/review-store"
 import { useLintStore } from "@/stores/lint-store"
 import { useChatStore } from "@/stores/chat-store"
+import { BASE_FONT_SIZE_PX, useZoomStore } from "@/stores/zoom-store"
 import { listDirectory, openProject } from "@/commands/fs"
 import { getLastProject, getRecentProjects, saveLastProject, loadLlmConfig, loadLanguage, loadSearchApiConfig, loadEmbeddingConfig, loadMineruConfig, loadMultimodalConfig, loadOutputLanguage, loadProviderConfigs, loadActivePresetId, loadProxyConfig, loadScheduledImportConfig, saveScheduledImportConfig, loadSourceWatchConfig, loadApiConfig, loadGeneralConfig, loadZoomLevel } from "@/lib/project-store"
 import { loadReviewItems, loadLintItems, loadChatHistory } from "@/lib/persist"
@@ -17,12 +18,17 @@ import { WelcomeScreen } from "@/components/project/welcome-screen"
 import { CreateProjectDialog } from "@/components/project/create-project-dialog"
 import type { WikiProject } from "@/types/wiki"
 
+function applyDocumentZoom(level: number) {
+  document.documentElement.style.fontSize = `${BASE_FONT_SIZE_PX * level}px`
+}
+
 function App() {
   const project = useWikiStore((s) => s.project)
   const setProject = useWikiStore((s) => s.setProject)
   const setFileTree = useWikiStore((s) => s.setFileTree)
   const setSelectedFile = useWikiStore((s) => s.setSelectedFile)
   const setActiveView = useWikiStore((s) => s.setActiveView)
+  const zoomLevel = useZoomStore((s) => s.level)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [loading, setLoading] = useState(true)
 
@@ -31,6 +37,13 @@ function App() {
     setupAutoSave()
     startClipWatcher()
   }, [])
+
+  useEffect(() => {
+    // Apply interface zoom globally, including welcome/settings screens. We
+    // scale the rem base instead of using transform: scale() so layout and
+    // pointer coordinates remain native; fixed-pixel panels keep their caps.
+    applyDocumentZoom(zoomLevel)
+  }, [zoomLevel])
 
   // Dev-only helper for visually testing the update-banner UX.
   // Open dev tools and run:
@@ -179,6 +192,10 @@ function App() {
   useEffect(() => {
     async function init() {
       try {
+        const savedZoom = await loadZoomLevel()
+        applyDocumentZoom(savedZoom)
+        useZoomStore.getState().setLevel(savedZoom)
+
         const savedConfig = await loadLlmConfig()
         if (savedConfig) {
           useWikiStore.getState().setLlmConfig(savedConfig)
@@ -270,11 +287,6 @@ function App() {
         const savedLang = await loadLanguage()
         if (savedLang) {
           await i18n.changeLanguage(savedLang)
-        }
-        const savedZoom = await loadZoomLevel()
-        if (savedZoom !== 1) {
-          const { useZoomStore } = await import("@/stores/zoom-store")
-          useZoomStore.getState().setLevel(savedZoom)
         }
         const lastProject = await getLastProject()
         if (lastProject) {

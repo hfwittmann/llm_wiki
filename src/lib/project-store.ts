@@ -3,6 +3,7 @@ import type { WikiProject } from "@/types/wiki"
 import type { ApiConfig, GeneralConfig, LlmConfig, SearchApiConfig, EmbeddingConfig, MineruConfig, MultimodalConfig, OutputLanguage, ProviderConfigs, ProxyConfig, ScheduledImportConfig, SourceWatchConfig } from "@/stores/wiki-store"
 import { normalizeSourceWatchConfig } from "@/lib/source-watch-config"
 import { normalizePath } from "@/lib/path-utils"
+import { DEFAULT_ZOOM_LEVEL, clampZoomLevel } from "@/stores/zoom-store"
 
 const STORE_NAME = "app-state.json"
 const RECENT_PROJECTS_KEY = "recentProjects"
@@ -120,8 +121,15 @@ function normalizeMineruConfig(config: MineruConfig): MineruConfig {
   }
 }
 
+function normalizeZoomLevel(level: unknown): number {
+  return typeof level === "number" && Number.isFinite(level)
+    ? clampZoomLevel(level)
+    : DEFAULT_ZOOM_LEVEL
+}
+
 export const __projectStoreTest = {
   normalizeMineruConfig,
+  normalizeZoomLevel,
 }
 
 export async function saveMineruConfig(config: MineruConfig): Promise<void> {
@@ -385,12 +393,12 @@ const ZOOM_LEVEL_KEY = "zoomLevel"
 
 export async function saveZoomLevel(level: number): Promise<void> {
   const store = await getStore()
-  await store.set(ZOOM_LEVEL_KEY, level)
+  await store.set(ZOOM_LEVEL_KEY, normalizeZoomLevel(level))
   await store.save()
 }
 
 export async function loadZoomLevel(): Promise<number> {
   const store = await getStore()
   const level = await store.get<number>(ZOOM_LEVEL_KEY)
-  return typeof level === "number" && level >= 0.5 && level <= 3 ? level : 1
+  return normalizeZoomLevel(level)
 }

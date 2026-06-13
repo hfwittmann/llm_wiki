@@ -4,6 +4,7 @@ import { Plus, Minus } from "lucide-react"
 import type { SettingsDraft, DraftSetter } from "../settings-types"
 import type { AppTheme } from "@/lib/theme"
 import { useState, useEffect } from "react"
+import { MAX_ZOOM_LEVEL, MIN_ZOOM_LEVEL, ZOOM_STEP, clampZoomLevel, roundZoomLevel } from "@/stores/zoom-store"
 
 interface Props {
   draft: SettingsDraft
@@ -22,14 +23,6 @@ const THEMES = [
   { value: "system" as const, labelKey: "settings.sections.interface.themeSystem" },
 ]
 
-const MIN_ZOOM = 0.5
-const MAX_ZOOM = 3
-const STEP = 0.05
-
-function clampZoom(v: number): number {
-  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, v))
-}
-
 export function InterfaceSection({ draft, setDraft, onThemeChange }: Props) {
   const { t } = useTranslation()
   const level = draft.zoomLevel
@@ -41,14 +34,14 @@ export function InterfaceSection({ draft, setDraft, onThemeChange }: Props) {
   }, [level])
 
   const handleZoom = (next: number) => {
-    setDraft("zoomLevel", clampZoom(next))
+    setDraft("zoomLevel", clampZoomLevel(roundZoomLevel(next)))
   }
 
   const commitInput = () => {
     const raw = inputText.replace(/[^0-9.]/g, "")
     const parsed = parseFloat(raw)
     if (!isNaN(parsed) && parsed > 0) {
-      setDraft("zoomLevel", clampZoom(parsed / 100))
+      setDraft("zoomLevel", clampZoomLevel(parsed / 100))
     } else {
       // Reset to current draft value
       setInputText(String(Math.round(level * 100)))
@@ -122,10 +115,10 @@ export function InterfaceSection({ draft, setDraft, onThemeChange }: Props) {
         <Label>{t("settings.sections.interface.zoom")}</Label>
         <div className="flex items-center gap-1">
           <button
-            onClick={() => handleZoom(level - STEP)}
-            disabled={level <= MIN_ZOOM}
+            onClick={() => handleZoom(level - ZOOM_STEP)}
+            disabled={level <= MIN_ZOOM_LEVEL}
             className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-30 disabled:pointer-events-none transition-colors"
-            aria-label="Zoom out"
+            aria-label={t("settings.sections.interface.zoomOut")}
           >
             <Minus className="size-3.5" />
           </button>
@@ -146,14 +139,17 @@ export function InterfaceSection({ draft, setDraft, onThemeChange }: Props) {
           </div>
 
           <button
-            onClick={() => handleZoom(level + STEP)}
-            disabled={level >= MAX_ZOOM}
+            onClick={() => handleZoom(level + ZOOM_STEP)}
+            disabled={level >= MAX_ZOOM_LEVEL}
             className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-30 disabled:pointer-events-none transition-colors"
-            aria-label="Zoom in"
+            aria-label={t("settings.sections.interface.zoomIn")}
           >
             <Plus className="size-3.5" />
           </button>
         </div>
+        <p className="text-xs text-muted-foreground">
+          {t("settings.sections.interface.zoomHint")}
+        </p>
       </div>
     </div>
   )

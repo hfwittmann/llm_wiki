@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useWikiStore } from "@/stores/wiki-store"
-import { useZoomStore } from "@/stores/zoom-store"
 import { listDirectory } from "@/commands/fs"
 import { normalizePath } from "@/lib/path-utils"
 import { IconSidebar } from "./icon-sidebar"
@@ -90,18 +89,6 @@ export function AppLayout({ onSwitchProject }: AppLayoutProps) {
   // right) so the settings screen uses the whole content area.
   const isSettings = activeView === "settings"
   const hasRightPanel = !isSettings && !!(selectedFile || researchPanelOpen)
-
-  // Zoom — adjust root font-size so all rem units scale proportionally.
-  // Using `transform: scale()` would also zoom visually, but it doesn't
-  // change actual layout dimensions, causing mouse coordinates to drift
-  // during sidebar drag-resize and container alignment issues.  Changing
-  // the rem base avoids those problems because every layout unit expands
-  // natively — Tailwind uses rem for spacing, typography, and sizing, so
-  // the whole UI scales correctly.
-  const zoomLevel = useZoomStore((s) => s.level)
-  useEffect(() => {
-    document.documentElement.style.fontSize = `${16 * zoomLevel}px`
-  }, [zoomLevel])
 
   return (
     // Outer column layout: full-width update banner on top (when an

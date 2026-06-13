@@ -333,6 +333,8 @@ export function SettingsView() {
       loadApiConfig,
       saveGeneralConfig,
       loadGeneralConfig,
+      saveZoomLevel,
+      loadZoomLevel,
     } = await import("@/lib/project-store")
 
     const newLlm = {
@@ -505,7 +507,6 @@ export function SettingsView() {
       }
 
       // Apply zoom level
-      const { saveZoomLevel } = await import("@/lib/project-store")
       useZoomStore.getState().setLevel(draft.zoomLevel)
       await saveZoomLevel(draft.zoomLevel)
 
@@ -528,6 +529,7 @@ export function SettingsView() {
           persistedMineru,
           persistedApi,
           persistedGeneral,
+          persistedZoom,
         ] = await Promise.allSettled([
           loadLlmConfig(),
           loadEmbeddingConfig(),
@@ -539,6 +541,7 @@ export function SettingsView() {
           loadMineruConfig(),
           loadApiConfig(),
           loadGeneralConfig(),
+          loadZoomLevel(),
         ] as const)
         setLlmConfig(resultValue(persistedLlm, null) ?? llmConfig)
         setEmbeddingConfig(resultValue(persistedEmbedding, null) ?? embeddingConfig)
@@ -551,6 +554,7 @@ export function SettingsView() {
         setMineruConfig(resultValue(persistedMineru, null) ?? mineruConfig)
         setApiConfig(resultValue(persistedApi, null) ?? apiConfig)
         setGeneralConfig(resultValue(persistedGeneral, generalConfig))
+        useZoomStore.getState().setLevel(resultValue(persistedZoom, useZoomStore.getState().level))
       } catch (reloadErr) {
         console.warn("[settings] failed to reload persisted settings after save failure:", reloadErr)
       }

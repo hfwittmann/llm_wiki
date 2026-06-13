@@ -6,14 +6,24 @@ export interface ZoomState {
   setLevel: (level: number) => void
 }
 
+export const DEFAULT_ZOOM_LEVEL = 1
+export const MIN_ZOOM_LEVEL = 0.5
+export const MAX_ZOOM_LEVEL = 3
+export const ZOOM_STEP = 0.05
+export const BASE_FONT_SIZE_PX = 16
+
 /**
- * Clamp the zoom level between 0.5 (50%) and 3 (300%).
+ * Clamp the zoom level between the configured minimum and maximum.
  */
-function clamp(v: number): number {
-  return Math.min(3, Math.max(0.5, v))
+export function clampZoomLevel(v: number): number {
+  return Math.min(MAX_ZOOM_LEVEL, Math.max(MIN_ZOOM_LEVEL, v))
+}
+
+export function roundZoomLevel(v: number): number {
+  return Math.round(v * 100) / 100
 }
 
 export const useZoomStore = create<ZoomState>((set) => ({
-  level: 1,
-  setLevel: (level: number) => set({ level: clamp(level) }),
+  level: DEFAULT_ZOOM_LEVEL,
+  setLevel: (level: number) => set({ level: clampZoomLevel(level) }),
 }))
