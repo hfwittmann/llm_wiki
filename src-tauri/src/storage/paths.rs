@@ -71,7 +71,8 @@ mod tests {
     fn resolves_a_valid_relative_path() {
         let dir = setup();
         let resolved = resolve_under(dir.path(), "sub/nested/file.txt").unwrap();
-        assert_eq!(resolved, dir.path().canonicalize().unwrap().join("sub/nested/file.txt"));
+        let expected = dir.path().join("sub/nested/file.txt").canonicalize().unwrap();
+        assert_eq!(resolved, expected);
     }
 
     #[test]
@@ -99,6 +100,8 @@ mod tests {
     fn accepts_curdir_segments() {
         let dir = setup();
         let resolved = resolve_under(dir.path(), "./sub/./nested/file.txt").unwrap();
+        let root_canon = dir.path().canonicalize().unwrap();
+        assert!(resolved.starts_with(&root_canon));
         assert!(resolved.ends_with("file.txt"));
     }
 
@@ -136,6 +139,8 @@ mod tests {
         )
         .unwrap();
         let resolved = resolve_under(dir.path(), "link_in").unwrap();
+        let root_canon = dir.path().canonicalize().unwrap();
+        assert!(resolved.starts_with(&root_canon));
         assert!(resolved.ends_with("file.txt"));
     }
 
@@ -150,5 +155,32 @@ mod tests {
             .to_string();
         let second = resolve_under(dir.path(), &rel).unwrap();
         assert_eq!(first, second);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn invalid_when_root_does_not_exist() {
+        let dir = TempDir::new().unwrap();
+        let root = dir.path().join("does_not_exist");
+        // root path is gone before we resolve_under it.
+        let result = resolve_under(&root, "anything");
+        assert!(matches!(result, Err(PathError::Invalid(_))));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn invalid_when_joined_path_is_a_symlink_loop() {
+        use std::os::unix::fs::symlink;
+        let dir = setup();
+        // self-referential symlink: loop -> loop
+        symlink(dir.path().join("loop"), dir.path().join("loop")).unwrap();
+        let result = resolve_under(dir.path(), "loop");
+        // canonicalize on a symlink loop returns ELOOP, which our code maps
+        // to PathError::Invalid (not NotFound).
+        assert!(
+            matches!(result, Err(PathError::Invalid(_))),
+            "expected Invalid for symlink loop, got {:?}",
+            result
+        );
     }
 }
