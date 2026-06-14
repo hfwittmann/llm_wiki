@@ -17,6 +17,7 @@ pub mod session_event_sink;
 pub mod projects;
 pub mod sources;
 pub mod wiki;
+pub mod chat;
 
 use std::sync::Arc;
 
@@ -39,6 +40,7 @@ pub struct AppState {
     pub user_data: UserData,
     pub session_bus: SessionBus,
     pub config: Arc<ServerConfig>,
+    pub llm_client: Arc<crate::core::llm_client::LlmClient>,
 }
 
 pub fn main_router(state: AppState) -> Router {
@@ -48,6 +50,7 @@ pub fn main_router(state: AppState) -> Router {
         .merge(projects::projects_router())
         .merge(sources::sources_router())
         .merge(wiki::wiki_router())
+        .merge(chat::chat_router())
         .route("/api/v1/events", get(events::events_handler))
         // Session middleware: extract cookie, inject User if valid.
         .route_layer(from_fn_with_state(state.clone(), auth::session_middleware))
@@ -107,6 +110,7 @@ mod tests {
             user_data,
             session_bus: bus,
             config: Arc::new(cfg),
+            llm_client: Arc::new(crate::core::llm_client::LlmClient::new()),
         };
         (dir, state)
     }
@@ -140,6 +144,7 @@ mod tests {
             user_data,
             session_bus: bus,
             config: Arc::new(cfg),
+            llm_client: Arc::new(crate::core::llm_client::LlmClient::new()),
         };
         (dir, state)
     }
@@ -539,6 +544,7 @@ mod tests {
             user_data,
             session_bus: bus,
             config: std::sync::Arc::new(cfg),
+            llm_client: std::sync::Arc::new(crate::core::llm_client::LlmClient::new()),
         };
         (dir, state, projects_root)
     }

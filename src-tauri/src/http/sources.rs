@@ -227,6 +227,7 @@ mod tests {
             user_data,
             session_bus: bus,
             config: Arc::new(cfg),
+            llm_client: Arc::new(crate::core::llm_client::LlmClient::new()),
         }
     }
 

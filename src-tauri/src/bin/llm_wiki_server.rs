@@ -33,6 +33,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let sessions = Sessions::open(&config.data_root.join("sessions"))?;
     let user_data = UserData::new(config.data_root.clone());
     let session_bus = SessionBus::new();
+    let llm_client = std::sync::Arc::new(llm_wiki_lib::core::llm_client::LlmClient::new());
 
     let state = AppState {
         users: std::sync::Arc::new(users),
@@ -40,6 +41,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         user_data,
         session_bus,
         config: std::sync::Arc::new(config.clone()),
+        llm_client,
     };
 
     // Main listener: 0.0.0.0:<port> with auth.
