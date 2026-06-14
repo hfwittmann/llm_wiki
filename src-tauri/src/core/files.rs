@@ -329,7 +329,7 @@ pub(crate) fn write_cache(original: &Path, text: &str) -> Result<(), String> {
 /// pdfium lock internally. We must NOT take it here too —
 /// `std::sync::Mutex` is non-reentrant.
 pub(crate) fn extract_pdf_text(path: &str, include_images: bool) -> Result<String, String> {
-    use crate::commands::extract_images::{extract_pdf_markdown, ExtractOptions};
+    use crate::core::extract::{pdf::extract_markdown as extract_pdf_markdown, ExtractOptions};
 
     if include_images {
         let p = Path::new(path);
