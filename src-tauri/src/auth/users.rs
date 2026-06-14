@@ -40,7 +40,7 @@ struct UsersFile {
     users: HashMap<String, UserRecord>,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct Users {
     by_id: HashMap<String, UserRecord>,
     display_names: HashMap<String, String>,
