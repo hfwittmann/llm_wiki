@@ -1014,6 +1014,14 @@ export function GraphView() {
                     labelWeight: "bold",
                     labelColor: { color: graphPalette.label },
                     stagePadding: 30,
+                    // Allow the container to have 0 width/height during the
+                    // initial mount and tab-switch transitions. Without this
+                    // Sigma throws Uncaught Error: Container has no width
+                    // whenever the graph view is rendered behind a hidden
+                    // parent (e.g. project just opened, layout not yet
+                    // measured) — the graph then never recovers without a
+                    // full reload.
+                    allowInvalidContainer: true,
                   }}
                 >
                   <GraphLoader
