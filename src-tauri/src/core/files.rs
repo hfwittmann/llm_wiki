@@ -288,7 +288,10 @@ pub(crate) fn is_absolute_path_cross_platform(path: &str) -> bool {
         return true;
     }
 
-    path.starts_with(r"\\") || path.starts_with("//")
+    // Unix-style absolute paths must remain "absolute" when the request reaches
+    // a Windows host (e.g. a Linux client passing "/tmp/x" through a wire
+    // protocol). Path::is_absolute on Windows rejects them.
+    path.starts_with('/') || path.starts_with(r"\\")
 }
 
 fn cache_path_for(original: &Path) -> std::path::PathBuf {
