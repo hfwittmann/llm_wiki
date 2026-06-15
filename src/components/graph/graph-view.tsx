@@ -1058,7 +1058,7 @@ export function GraphView() {
           )}
 
           {showFilters && (
-            <div className="absolute top-3 left-3 w-72 rounded-lg border border-border bg-popover p-3 text-xs shadow-lg">
+            <div className="absolute top-3 left-3 w-72 rounded-lg border bg-background/95 p-3 text-xs shadow-lg backdrop-blur-sm">
               <div className="mb-3 flex items-center justify-between">
                 <div className="flex items-center gap-1.5 font-semibold text-foreground">
                   <Filter className="h-3.5 w-3.5" />
@@ -1242,7 +1242,7 @@ export function GraphView() {
           )}
 
           {/* Legend */}
-          <div className="absolute bottom-3 left-3 rounded-lg border border-border bg-popover px-3 py-2 text-xs shadow-lg max-w-[260px]">
+          <div className="absolute bottom-3 left-3 rounded-lg border bg-background/90 backdrop-blur-sm px-3 py-2 text-xs shadow-sm max-w-[260px]">
             <div className="flex items-center justify-between mb-1.5">
               <span className="font-semibold text-foreground">
                 {colorMode === "type" ? t("graph.nodeTypesLabel") : t("graph.communitiesLabel")}
@@ -1281,7 +1281,7 @@ export function GraphView() {
                         return (
                           <div
                             key={type}
-                            className={`flex items-center gap-2 rounded px-1 py-0.5 transition-colors hover:bg-accent/50 ${isHidden ? "opacity-70" : ""}`}
+                            className={`flex items-center gap-2 rounded px-1 py-0.5 transition-colors hover:bg-accent/50 ${isHidden ? "opacity-40" : ""}`}
                             onMouseEnter={() => setHoveredType(type)}
                             onMouseLeave={() => setHoveredType(null)}
                             onDoubleClick={() => {
@@ -1304,10 +1304,10 @@ export function GraphView() {
                                 boxShadow: `0 0 4px ${hexToRgba(isHidden ? "#94a3b8" : nodeColor(type), 0.4)}`,
                               }}
                             />
-                            <span className={hoveredType === type ? "text-foreground font-medium" : "text-foreground"}>
+                            <span className={hoveredType === type ? "text-foreground font-medium" : "text-muted-foreground"}>
                               {label}
                             </span>
-                            <span className="text-foreground/70 ml-auto">{typeCounts[type]}</span>
+                            <span className="text-muted-foreground/60 ml-auto">{typeCounts[type]}</span>
                             {isHidden && <span className="text-muted-foreground/60 text-[10px]">{t("graph.hidden")}</span>}
                           </div>
                         )
@@ -1329,10 +1329,10 @@ export function GraphView() {
                           boxShadow: `0 0 4px ${hexToRgba(COMMUNITY_COLORS[c.id % COMMUNITY_COLORS.length], 0.4)}`,
                         }}
                       />
-                      <span className="text-foreground/85 truncate" title={c.topNodes.join(", ")}>
+                      <span className="text-muted-foreground truncate" title={c.topNodes.join(", ")}>
                         {c.topNodes[0] ?? `${t("graph.cluster", { id: c.id })}`}
                       </span>
-                      <span className="text-muted-foreground ml-auto shrink-0">{c.nodeCount}</span>
+                      <span className="text-muted-foreground/60 ml-auto shrink-0">{c.nodeCount}</span>
                       {c.cohesion < 0.15 && c.nodeCount >= 3 && (
                         <span className="text-amber-500 shrink-0" title={`Low cohesion: ${c.cohesion.toFixed(2)}`}>!</span>
                       )}
