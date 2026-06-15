@@ -1058,7 +1058,7 @@ export function GraphView() {
           )}
 
           {showFilters && (
-            <div className="absolute top-3 left-3 w-72 rounded-lg border bg-background/95 p-3 text-xs shadow-lg backdrop-blur-sm">
+            <div className="absolute top-3 left-3 w-72 rounded-lg border border-border bg-popover p-3 text-xs shadow-lg">
               <div className="mb-3 flex items-center justify-between">
                 <div className="flex items-center gap-1.5 font-semibold text-foreground">
                   <Filter className="h-3.5 w-3.5" />
@@ -1242,7 +1242,7 @@ export function GraphView() {
           )}
 
           {/* Legend */}
-          <div className="absolute bottom-3 left-3 rounded-lg border bg-background/90 backdrop-blur-sm px-3 py-2 text-xs shadow-sm max-w-[260px]">
+          <div className="absolute bottom-3 left-3 rounded-lg border border-border bg-popover px-3 py-2 text-xs shadow-lg max-w-[260px]">
             <div className="flex items-center justify-between mb-1.5">
               <span className="font-semibold text-foreground">
                 {colorMode === "type" ? t("graph.nodeTypesLabel") : t("graph.communitiesLabel")}
