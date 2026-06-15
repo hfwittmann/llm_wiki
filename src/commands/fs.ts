@@ -66,22 +66,38 @@ export async function writeFileAtomic(path: string, contents: string): Promise<v
 // ── Directory listing ─────────────────────────────────────────────────────────
 
 export async function listDirectory(path: string): Promise<FileNode[]> {
-  const qs = new URLSearchParams({ path })
   // Server returns `{entries: [{name, is_dir, is_project, size, modified_unix}]}`
-  // — name only, no full path. Legacy Tauri version returned absolute paths
-  // per entry, and several callers rely on `entry.path`. Reconstruct it here
-  // by joining the parent (which the caller passed in) with each entry name.
+  // — flat, immediate children only, names only. Legacy Tauri's
+  // `list_directory` was recursive AND returned absolute paths per entry.
+  // Callers (graph view, file tree) walk `node.children`, so we recurse
+  // here in the wrapper to preserve that contract. Phase-6 can move
+  // recursion server-side via a `?recursive=true` query param if the
+  // ~N-extra-roundtrip cost becomes a problem.
   type ServerEntry = { name: string; is_dir: boolean }
-  const resp = await apiCall<{ entries: ServerEntry[] }>(
-    "GET",
-    `/api/v1/fs/list?${qs.toString()}`,
-  )
-  const parent = path.replace(/\/+$/, "")
-  return resp.entries.map((e) => ({
-    name: e.name,
-    is_dir: e.is_dir,
-    path: parent === "" ? e.name : `${parent}/${e.name}`,
-  }))
+  const visit = async (dir: string): Promise<FileNode[]> => {
+    const qs = new URLSearchParams({ path: dir })
+    let resp: { entries: ServerEntry[] }
+    try {
+      resp = await apiCall<{ entries: ServerEntry[] }>(
+        "GET",
+        `/api/v1/fs/list?${qs.toString()}`,
+      )
+    } catch {
+      return []
+    }
+    const parent = dir.replace(/\/+$/, "")
+    const out: FileNode[] = []
+    for (const e of resp.entries) {
+      const fullPath = parent === "" ? e.name : `${parent}/${e.name}`
+      const node: FileNode = { name: e.name, is_dir: e.is_dir, path: fullPath }
+      if (e.is_dir) {
+        node.children = await visit(fullPath)
+      }
+      out.push(node)
+    }
+    return out
+  }
+  return await visit(path)
 }
 
 // ── File operations (internal-only stubs) ─────────────────────────────────────
