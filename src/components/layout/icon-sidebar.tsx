@@ -1,4 +1,3 @@
-import { useState, useEffect } from "react"
 import {
   FileText, FolderOpen, Search, Network, ClipboardCheck, Settings, ArrowLeftRight, ClipboardList, Globe,
 } from "lucide-react"
@@ -42,23 +41,6 @@ export function IconSidebar({ onSwitchProject }: IconSidebarProps) {
   // remaining indicator that an update is available, so the user
   // never finds their way back to it.
   const updateAvailable = useUpdateStore((s) => hasAvailableUpdate(s))
-
-  // Daemon health check
-  const [daemonStatus, setDaemonStatus] = useState<string>("starting")
-  useEffect(() => {
-    const check = async () => {
-      try {
-        const { clipServerStatus } = await import("@/commands/fs")
-        const status = await clipServerStatus()
-        setDaemonStatus(status)
-      } catch {
-        setDaemonStatus("error")
-      }
-    }
-    check()
-    const interval = setInterval(check, 30000)
-    return () => clearInterval(interval)
-  }, [])
 
   return (
     <TooltipProvider delay={300}>
@@ -116,27 +98,8 @@ export function IconSidebar({ onSwitchProject }: IconSidebarProps) {
             <TooltipContent side="right">{t("research.title")}</TooltipContent>
           </Tooltip>
         </div>
-        {/* Bottom: daemon status + settings + switch project */}
+        {/* Bottom: settings + switch project */}
         <div className="flex flex-col items-center gap-1 pb-1">
-          {/* Daemon status indicator */}
-          <Tooltip>
-            <TooltipTrigger className="flex h-6 w-6 items-center justify-center">
-              <span
-                className={`h-2.5 w-2.5 rounded-full ${
-                  daemonStatus === "running" ? "bg-emerald-500" :
-                  daemonStatus === "starting" ? "bg-amber-400 animate-pulse" :
-                  daemonStatus === "port_conflict" ? "bg-red-500" :
-                  "bg-red-500 animate-pulse"
-                }`}
-              />
-            </TooltipTrigger>
-            <TooltipContent side="right">
-              {daemonStatus === "running" && "Clip server running"}
-              {daemonStatus === "starting" && "Clip server starting..."}
-              {daemonStatus === "port_conflict" && "Port 19827 is occupied. Web Clipper unavailable."}
-              {daemonStatus === "error" && "Clip server error. Restarting..."}
-            </TooltipContent>
-          </Tooltip>
           <Tooltip>
             <TooltipTrigger
               onClick={() => setActiveView("settings")}
