@@ -3,6 +3,13 @@ import { hasConfiguredDeepResearchSources, hasConfiguredSearchProvider, resolveS
 
 const fetchMock = vi.fn<typeof fetch>()
 
+// proxyFetch in api.ts forwards requests through /api/v1/proxy/raw. In tests
+// we bypass the proxy layer and call fetchMock directly so assertions on
+// URL/headers/body shapes keep working without a running server.
+vi.mock("@/lib/api", () => ({
+  proxyFetch: (url: string, init?: RequestInit) => fetchMock(url, init),
+}))
+
 function jsonResponse(body: unknown, init?: ResponseInit): Response {
   return new Response(JSON.stringify(body), {
     status: 200,

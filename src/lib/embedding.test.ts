@@ -36,6 +36,13 @@ vi.mock("@/lib/llm-client", () => ({
       (err.message === "Load failed" || err.message === "Failed to fetch")),
 }))
 
+// proxyFetch in api.ts forwards requests through /api/v1/proxy/raw. In tests
+// we bypass the proxy layer and call mockHttpFetch directly so assertions
+// on URL/headers/body shapes keep working without a running server.
+vi.mock("@/lib/api", () => ({
+  proxyFetch: (url: string, init?: RequestInit) => mockHttpFetch(url, init),
+}))
+
 // readFile / listDirectory aren't exercised in this file's cases; stub.
 vi.mock("@/commands/fs", () => ({
   readFile: vi.fn(),

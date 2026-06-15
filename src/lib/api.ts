@@ -107,6 +107,53 @@ export async function apiFetch(
   });
 }
 
+/**
+ * Forward an HTTP request through the server-side proxy at /api/v1/proxy/raw.
+ *
+ * Returns a normal `Response` — callers can use `.text()`, `.json()`,
+ * `.body` for streams, etc., just like with plain `fetch()`.
+ *
+ * Solves CORS for browser → third-party LLM/embedding/web-search calls.
+ * The frontend already has the API key (loaded via /config); the server
+ * is just a CORS-bypass proxy, not a security boundary.
+ */
+export async function proxyFetch(url: string, init: RequestInit = {}): Promise<Response> {
+  const method = (init.method ?? "GET").toUpperCase();
+
+  // Normalize headers — `HeadersInit` may be a Headers object, an array, or a record.
+  const headers: Record<string, string> = {};
+  if (init.headers) {
+    const hi = init.headers;
+    if (hi instanceof Headers) {
+      hi.forEach((v, k) => { headers[k] = v });
+    } else if (Array.isArray(hi)) {
+      for (const [k, v] of hi) headers[k] = v;
+    } else {
+      for (const [k, v] of Object.entries(hi as Record<string, string>)) headers[k] = v;
+    }
+  }
+
+  // Body must be a string (JSON.stringified) — we forward as-is.
+  let body: string | undefined;
+  if (init.body != null) {
+    if (typeof init.body === "string") {
+      body = init.body;
+    } else {
+      // For Blob/FormData/etc., we'd need to serialize differently. For now,
+      // assume JSON.stringify was already called by the caller (true for all
+      // LLM/embedding/web-search callers in this codebase).
+      throw new Error("proxyFetch: only string bodies are supported");
+    }
+  }
+
+  return await apiFetch("POST", "/api/v1/proxy/raw", {
+    url,
+    method,
+    headers,
+    body,
+  });
+}
+
 /** Builds a URL to the file preview endpoint with proper escaping. */
 export function fileRawUrl(projectPath: string, filePath: string): string {
   const qs = new URLSearchParams({

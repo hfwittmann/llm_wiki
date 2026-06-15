@@ -2,6 +2,7 @@ import type { LlmConfig } from "@/stores/wiki-store"
 import { isAzureOpenAiEndpoint } from "@/lib/azure-openai"
 import { getProviderConfig, type RequestOverrides } from "./llm-providers"
 import { countReasoningCharsInLine, extractReasoningTextFromLine } from "./reasoning-detector"
+import { proxyFetch } from "@/lib/api"
 
 export type { ChatMessage, ContentBlock, RequestOverrides } from "./llm-providers"
 
@@ -93,7 +94,7 @@ export async function streamChat(
   let response: Response
   try {
     const body = providerConfig.buildBody(messages, requestOverrides)
-    response = await fetch(providerConfig.url, {
+    response = await proxyFetch(providerConfig.url, {
       method: "POST",
       headers: providerConfig.headers,
       body: JSON.stringify(body),

@@ -4,6 +4,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 // isFetchNetworkError is now defined directly in llm-client.ts (no tauri-fetch dep).
 const mockHttpFetch = vi.fn<(url: string, opts?: RequestInit) => Promise<Response>>()
 
+// proxyFetch in api.ts forwards requests through /api/v1/proxy/raw. In tests
+// we bypass the proxy layer and call mockHttpFetch directly so abort/error
+// handling tests work correctly (signal forwarding, stream-reader injection).
+vi.mock("@/lib/api", () => ({
+  proxyFetch: (url: string, init?: RequestInit) => mockHttpFetch(url, init),
+}))
+
 import { isFetchNetworkError, streamChat } from "./llm-client"
 import type { LlmConfig } from "@/stores/wiki-store"
 

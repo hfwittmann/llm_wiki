@@ -15,6 +15,7 @@
  */
 
 import { isFetchNetworkError } from "./llm-client"
+import { proxyFetch } from "@/lib/api"
 
 /** The subset of the GitHub release API response we care about. */
 /**
@@ -103,7 +104,7 @@ export async function fetchLatestRelease(
 ): Promise<GithubRelease | null> {
   const url = `https://api.github.com/repos/${repo}/releases/latest`
   try {
-    const resp = await fetch(url, {
+    const resp = await proxyFetch(url, {
       method: "GET",
       headers: {
         Accept: "application/vnd.github+json",

@@ -7,6 +7,7 @@ import type {
 } from "@/stores/wiki-store"
 import { isFetchNetworkError } from "@/lib/llm-client"
 import { hasConfiguredAnyTxt, normalizeAnyTxtConfig } from "@/lib/anytxt-search"
+import { proxyFetch } from "@/lib/api"
 
 export interface WebSearchResult {
   title: string
@@ -193,7 +194,7 @@ async function searXngSearch(
 
   let response: Response
   try {
-    response = await fetch(endpoint.toString(), {
+    response = await proxyFetch(endpoint.toString(), {
       method: "GET",
       headers: { Accept: "application/json" },
     })
@@ -254,7 +255,7 @@ async function tavilySearch(
 ): Promise<WebSearchResult[]> {
   let response: Response
   try {
-    response = await fetch("https://api.tavily.com/search", {
+    response = await proxyFetch("https://api.tavily.com/search", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -304,7 +305,7 @@ async function serpApiSearch(
 
   let response: Response
   try {
-    response = await fetch(`https://serpapi.com/search?${params.toString()}`, {
+    response = await proxyFetch(`https://serpapi.com/search?${params.toString()}`, {
       method: "GET",
       headers: { Accept: "application/json" },
     })
@@ -401,7 +402,7 @@ async function ollamaSearch(
 
   let response: Response
   try {
-    response = await fetch("https://ollama.com/api/web_search", {
+    response = await proxyFetch("https://ollama.com/api/web_search", {
       method: "POST",
       headers,
       body: JSON.stringify({

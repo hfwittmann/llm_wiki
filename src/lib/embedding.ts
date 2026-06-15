@@ -27,6 +27,7 @@ import { normalizePath } from "@/lib/path-utils"
 import { isFetchNetworkError } from "@/lib/llm-client"
 import { chunkMarkdown, type Chunk } from "@/lib/text-chunker"
 import { isLocalOrPrivateHttpEndpoint, localLlmOriginHeader } from "@/lib/llm-providers"
+import { proxyFetch } from "@/lib/api"
 
 const RESERVED_EMBEDDING_HEADER_NAMES = new Set([
   "authorization",
@@ -135,7 +136,7 @@ export async function fetchEmbedding(
   while (attempts <= maxRetries) {
     attempts++
     try {
-      const resp = await fetch(endpoint, {
+      const resp = await proxyFetch(endpoint, {
         method: "POST",
         headers,
         body: JSON.stringify(

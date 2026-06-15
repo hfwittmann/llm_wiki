@@ -2,6 +2,7 @@ import JSZip from "jszip"
 import type { MineruConfig } from "@/stores/wiki-store"
 import { createDirectory, getFileSize, readFileAsBase64, writeFileBase64 } from "@/commands/fs"
 import { getFileName, normalizePath } from "@/lib/path-utils"
+import { proxyFetch } from "@/lib/api"
 
 const API_BASE = "https://mineru.net/api/v4"
 const POLL_INTERVAL_MS = 3_000
@@ -342,7 +343,7 @@ async function submitUrlTask(
   signal?: AbortSignal,
 ): Promise<string> {
   throwIfAborted(signal)
-  const res = await fetch(`${API_BASE}/extract/task`, {
+  const res = await proxyFetch(`${API_BASE}/extract/task`, {
     method: "POST",
     headers: await mineruHeaders(token),
     signal,
@@ -365,7 +366,7 @@ async function uploadFileForTask(
   throwIfAborted(signal)
 
   // Step 1: Get upload URL
-  const res = await fetch(`${API_BASE}/file-urls/batch`, {
+  const res = await proxyFetch(`${API_BASE}/file-urls/batch`, {
     method: "POST",
     headers,
     signal,
@@ -422,7 +423,8 @@ async function pollTask(token: string, taskId: string, signal?: AbortSignal): Pr
 
   while (Date.now() - start < POLL_TIMEOUT_MS) {
     throwIfAborted(signal)
-    const res = await fetch(`${API_BASE}/extract/task/${taskId}`, {
+    const res = await proxyFetch(`${API_BASE}/extract/task/${taskId}`, {
+      method: "GET",
       headers,
       signal,
     })
@@ -453,9 +455,9 @@ async function pollBatchTask(
 
   while (Date.now() - start < POLL_TIMEOUT_MS) {
     throwIfAborted(signal)
-    const res = await fetch(
+    const res = await proxyFetch(
       `${API_BASE}/extract-results/batch/${batchId}`,
-      { headers, signal },
+      { method: "GET", headers, signal },
     )
     if (!res.ok) throw new Error(`MinerU batch poll failed: HTTP ${res.status}`)
     const json: BatchStatus = await res.json()
@@ -522,7 +524,7 @@ async function downloadAndExtractMarkdown(
   assetOptions?: MineruAssetOptions,
 ): Promise<string> {
   throwIfAborted(signal)
-  const res = await fetch(zipUrl, { signal })
+  const res = await proxyFetch(zipUrl, { method: "GET", signal })
   if (!res.ok) throw new Error(`MinerU zip download failed: HTTP ${res.status}`)
 
   const buffer = await res.arrayBuffer()
@@ -632,7 +634,7 @@ export async function parseWithMineru(
  * Returns true if the token is valid.
  */
 export async function testMineruConnection(token: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/extract/task`, {
+  const res = await proxyFetch(`${API_BASE}/extract/task`, {
     method: "POST",
     headers: await mineruHeaders(token),
     body: JSON.stringify({

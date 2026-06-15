@@ -17,6 +17,14 @@ vi.mock("@/commands/fs", () => ({
   writeFileBase64: fsMocks.writeFileBase64,
 }))
 
+// proxyFetch in api.ts forwards requests through /api/v1/proxy/raw. In tests
+// we bypass the proxy layer and call mockHttpFetch directly. The S3 binary
+// upload (fetch(uploadUrl, { body: ArrayBuffer })) is not routed through
+// proxyFetch and still reaches globalThis.fetch, which is also mockHttpFetch.
+vi.mock("@/lib/api", () => ({
+  proxyFetch: (url: string, init?: RequestInit) => mockHttpFetch(url, init),
+}))
+
 import { __mineruTest, parseWithMineru, testMineruConnection } from "./mineru"
 
 function jsonResponse(body: unknown, init?: ResponseInit): Response {

@@ -3,6 +3,7 @@ import { isFetchNetworkError } from "@/lib/llm-client"
 import { normalizePath } from "@/lib/path-utils"
 import { streamChat } from "@/lib/llm-client"
 import type { WebSearchResult } from "./web-search"
+import { proxyFetch } from "@/lib/api"
 
 export const DEFAULT_ANYTXT_ENDPOINT = "http://127.0.0.1:9920"
 export const DEFAULT_ANYTXT_FILTER_EXT = "*"
@@ -205,7 +206,7 @@ async function getAnyTxtFragment(endpoint: string, fid: string, pattern: string)
 async function callAnyTxtRpc(endpoint: string, method: string, input: Record<string, unknown>): Promise<unknown> {
   let response: Response
   try {
-    response = await fetch(endpoint, {
+    response = await proxyFetch(endpoint, {
       method: "POST",
       headers: {
         Accept: "application/json",
