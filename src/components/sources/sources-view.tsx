@@ -77,7 +77,13 @@ export function SourcesView() {
 
   useEffect(() => {
     loadSources()
-  }, [loadSources, dataVersion])
+    // Intentionally NOT re-running on `dataVersion`. Background file-sync
+    // events bump dataVersion frequently (every queue-updated SSE), and
+    // re-running loadSources for each event causes the Sources view to
+    // hang under React's render queue pressure. Use the Refresh button
+    // to manually trigger a fresh listDirectory + rescan.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadSources])
 
   async function handleRefreshSources() {
     if (!project || refreshing) return
