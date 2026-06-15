@@ -48,26 +48,19 @@ export async function readFile(
 
 export async function writeFile(path: string, contents: string): Promise<void> {
   assertAbsoluteFsPath("writeFile", path)
-  // TODO(5.4): update callers to pass (projectPath, pagePath, contents, etag)
-  // so we can use the /wiki/page PUT endpoint with If-Match. For now this is
-  // a no-op stub so the type contract is preserved until callers are rewired.
-  console.warn(
-    "[fs] writeFile: server-side write requires project_path + page_path + etag. " +
-    `Call site must be updated to use apiCall PUT /api/v1/wiki/page. path=${path}`,
-  )
-  void contents
+  await apiCall<void>("POST", "/api/v1/fs/write", { path, content: contents })
 }
 
-export async function writeFileBase64(_path: string, _base64: string): Promise<void> {
-  // TODO(stub): no HTTP equivalent for raw base64 file writes — the server
-  // handles image writes internally during ingest. No frontend caller should
-  // reach this path after Task 5.4 rewiring.
-  console.warn("[fs] writeFileBase64: no HTTP equivalent; operation is a no-op")
+export async function writeFileBase64(path: string, base64: string): Promise<void> {
+  assertAbsoluteFsPath("writeFileBase64", path)
+  await apiCall<void>("POST", "/api/v1/fs/write_base64", { path, base64 })
 }
 
 export async function writeFileAtomic(path: string, contents: string): Promise<void> {
   assertAbsoluteFsPath("writeFileAtomic", path)
-  // Delegates to writeFile — same HTTP path until callers are updated in 5.4.
+  // Server-side write already creates parent dirs and overwrites in place.
+  // True atomicity (tmp + rename) would need a dedicated endpoint; for now
+  // matches the desktop behavior closely enough that callers don't care.
   await writeFile(path, contents)
 }
 
@@ -141,9 +134,10 @@ export async function preprocessFile(_path: string): Promise<string> {
   return ""
 }
 
-export async function deleteFile(_path: string): Promise<void> {
-  // TODO(stub): no HTTP equivalent exposed to the frontend.
-  console.warn("[fs] deleteFile: no HTTP equivalent; operation is a no-op")
+export async function deleteFile(path: string): Promise<void> {
+  assertAbsoluteFsPath("deleteFile", path)
+  const qs = new URLSearchParams({ path })
+  await apiCall<void>("DELETE", `/api/v1/fs/file?${qs.toString()}`)
 }
 
 export async function findRelatedWikiPages(
@@ -155,18 +149,16 @@ export async function findRelatedWikiPages(
   return []
 }
 
-export async function createDirectory(_path: string): Promise<void> {
-  // TODO(stub): /fs/mkdir is available but rooted at projects_root, not
-  // arbitrary absolute paths. Update callers in Task 5.4 to use project-
-  // relative paths via apiCall POST /api/v1/fs/mkdir.
-  console.warn("[fs] createDirectory: no HTTP equivalent for absolute paths; operation is a no-op")
+export async function createDirectory(path: string): Promise<void> {
+  assertAbsoluteFsPath("createDirectory", path)
+  await apiCall<void>("POST", "/api/v1/fs/mkdir", { path })
 }
 
-export async function fileExists(_path: string): Promise<boolean> {
-  // TODO(stub): no dedicated HTTP endpoint. Callers should be eliminated
-  // in Task 5.4 as the server handles existence checks internally.
-  console.warn("[fs] fileExists: no HTTP equivalent; returning false")
-  return false
+export async function fileExists(path: string): Promise<boolean> {
+  assertAbsoluteFsPath("fileExists", path)
+  const qs = new URLSearchParams({ path })
+  const resp = await apiCall<{ exists: boolean }>("GET", `/api/v1/fs/exists?${qs.toString()}`)
+  return resp.exists
 }
 
 export async function getFileModifiedTime(_path: string): Promise<number> {
