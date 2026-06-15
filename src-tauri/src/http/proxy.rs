@@ -163,6 +163,7 @@ mod tests {
         std::fs::create_dir_all(&projects_root).unwrap();
 
         let cfg = ServerConfig {
+            bind: "127.0.0.1".into(),
             port: 8080,
             projects_root,
             data_root: dir.path().to_path_buf(),

@@ -120,6 +120,7 @@ mod tests {
         let user_data = UserData::new(dir.path().to_path_buf());
         let bus = SessionBus::new();
         let cfg = ServerConfig {
+            bind: "127.0.0.1".into(),
             port: 8080,
             projects_root: PathBuf::from("./projects"),
             data_root: dir.path().to_path_buf(),
@@ -154,6 +155,7 @@ mod tests {
         let user_data = UserData::new(dir.path().to_path_buf());
         let bus = SessionBus::new();
         let cfg = ServerConfig {
+            bind: "127.0.0.1".into(),
             port: 8080,
             projects_root: PathBuf::from("./projects"),
             data_root: dir.path().to_path_buf(),
@@ -460,6 +462,7 @@ mod tests {
         let projects_root = dir.path().join("projects");
         std::fs::create_dir_all(&projects_root).unwrap();
         let cfg = crate::config::ServerConfig {
+            bind: "127.0.0.1".into(),
             port: 8080,
             projects_root,
             data_root: dir.path().to_path_buf(),
@@ -519,7 +522,9 @@ mod tests {
         assert_eq!(resp.status(), 200);
         let body = to_bytes(resp.into_body(), 16384).await.unwrap();
         let s = String::from_utf8_lossy(&body);
-        assert!(s.contains("<!DOCTYPE html>"));
+        // HTML5 doctype is case-insensitive; Vite emits lowercase.
+        let lc = s.to_lowercase();
+        assert!(lc.contains("<!doctype html>"));
         assert!(s.contains("<html"));
     }
 
@@ -554,6 +559,7 @@ mod tests {
         std::fs::write(proj_dir.join("wiki/foo.md"), b"# Foo\n\nHello world.\n").unwrap();
 
         let cfg = crate::config::ServerConfig {
+            bind: "127.0.0.1".into(),
             port: 8080,
             projects_root: projects_root.clone(),
             data_root: dir.path().to_path_buf(),
@@ -910,6 +916,7 @@ mod tests {
         let projects_root = dir.path().join("projects");
         std::fs::create_dir_all(&projects_root).unwrap();
         let cfg = crate::config::ServerConfig {
+            bind: "127.0.0.1".into(),
             port: 8080,
             projects_root,
             data_root: dir.path().to_path_buf(),
@@ -987,6 +994,7 @@ mod tests {
         let projects_root = dir.path().join("projects");
         std::fs::create_dir_all(&projects_root).unwrap();
         let cfg = crate::config::ServerConfig {
+            bind: "127.0.0.1".into(),
             port: 8080,
             projects_root: projects_root.clone(),
             data_root: dir.path().to_path_buf(),
@@ -1288,6 +1296,7 @@ mod tests {
         std::fs::write(proj_dir.join("wiki/page.md"), b"# Page\n\nContent here.\n").unwrap();
 
         let cfg = crate::config::ServerConfig {
+            bind: "127.0.0.1".into(),
             port: 8080,
             projects_root: projects_root.clone(),
             data_root: dir.path().to_path_buf(),

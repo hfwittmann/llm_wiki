@@ -215,6 +215,7 @@ mod tests {
         let user_data = UserData::new(data_root.clone());
         let bus = SessionBus::new();
         let cfg = ServerConfig {
+            bind: "127.0.0.1".into(),
             port: 8080,
             projects_root,
             data_root,

@@ -9,7 +9,7 @@ use serde::Deserialize;
 use crate::http::auth::AuthUser;
 use crate::http::error::ApiError;
 use crate::http::AppState;
-use crate::storage::paths::{resolve_under, resolve_project_path};
+use crate::storage::paths::resolve_project_path;
 
 pub fn fs_browser_router() -> Router<AppState> {
     Router::new()

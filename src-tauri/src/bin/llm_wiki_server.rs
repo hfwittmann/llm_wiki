@@ -44,10 +44,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         llm_client,
     };
 
-    // Main listener: 0.0.0.0:<port> with auth.
-    let main_addr: SocketAddr = format!("0.0.0.0:{}", config.port).parse()?;
+    // Schedule a background task to prune expired session rows from sled.
+    // Lazy expiry on `lookup` covers the cookie-hot path; this catches
+    // sessions that were created and never looked up again.
+    let sessions_for_prune = state.sessions.clone();
+    tokio::spawn(async move {
+        let day = std::time::Duration::from_secs(60 * 60 * 24);
+        loop {
+            tokio::time::sleep(day).await;
+            match sessions_for_prune.prune_expired() {
+                Ok(n) if n > 0 => eprintln!("[sessions] pruned {n} expired"),
+                Ok(_) => {}
+                Err(e) => eprintln!("[sessions] prune failed: {e}"),
+            }
+        }
+    });
+
+    // Main listener: <bind>:<port> with auth.
+    // Default `bind` is 127.0.0.1 (loopback only). Set LLM_WIKI_BIND=0.0.0.0
+    // (or a specific LAN IP) to expose to other hosts. Opt-in by design:
+    // any authenticated user can forward HTTP through /proxy/raw, so we
+    // shouldn't accidentally be the LAN's confused-deputy egress.
+    let main_addr: SocketAddr = format!("{}:{}", config.bind, config.port).parse()?;
     let main_listener = tokio::net::TcpListener::bind(&main_addr).await?;
     eprintln!("listening on http://{main_addr}");
+    if config.bind == "127.0.0.1" {
+        eprintln!("(loopback only; set LLM_WIKI_BIND=0.0.0.0 to expose to LAN)");
+    }
 
     let main_app = main_router(state.clone());
     let main_serve = axum::serve(main_listener, main_app)

@@ -351,6 +351,7 @@ mod tests {
         std::fs::write(proj_dir.join("schema.md"), b"# Schema\n").unwrap();
 
         let cfg = ServerConfig {
+            bind: "127.0.0.1".into(),
             port: 8080,
             projects_root,
             data_root: dir.path().to_path_buf(),

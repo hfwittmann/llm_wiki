@@ -91,6 +91,8 @@ async-stream = "0.3"
 blake3 = "1"
 thiserror = "1"
 bincode = "1.3"
+# Used by the /proxy/raw SSRF guard to parse outbound URLs.
+url = "2"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread"] }
@@ -106,3 +108,4 @@ opt-level = "s"
 # larger binary, but prevents single-file corruption from killing the app.
 panic = "unwind"
 strip = true
+

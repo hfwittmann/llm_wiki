@@ -1,4 +1,27 @@
-# LLM Wiki
+# LLM Wiki — Browser/LAN fork
+
+> ⚠️ **This is a fork of [nashsu/llm_wiki](https://github.com/nashsu/llm_wiki) (GPL-3.0).**
+> The upstream is a Tauri desktop app. This fork replaces the Tauri shell with a
+> single Rust HTTP server (`llm-wiki-server`) that serves the React frontend to any
+> browser on the LAN. Designed for "a small trusted group sharing one wiki" —
+> multi-user accounts (per-user chat / LLM config), shared projects, no native
+> dialogs.
+>
+> **Threat model.** LAN-trusted users with shell access to the host.
+> *Not* hardened for public internet exposure: no HTTPS in the binary,
+> no CSRF tokens, no rate limiting, API keys stored on disk under `data_root`
+> with `0700`/`0600` perms. Front with nginx/Caddy + TLS + an auth-protecting
+> tier if exposing beyond LAN.
+>
+> **Key changes vs. upstream.** Tauri → axum HTTP. `tauri-plugin-store` → per-user
+> `/api/v1/config`. Native folder picker → server-side `<FolderBrowserDialog>`.
+> Tauri-fetch CORS bypass → `/api/v1/proxy/raw` (with SSRF guard). PDF text
+> preview via new `/api/v1/files/extracted-text`. Argon2 password auth + sled-backed
+> sessions. Server binds `127.0.0.1` by default; opt in to LAN with `LLM_WIKI_BIND=0.0.0.0`.
+> See `plans/2026-06-14-browser-lan-gui-design.md` for the full design.
+>
+> Original LLM Wiki copyright Yong Su, 2024-2026, GPL-3.0. This fork retains
+> the GPL-3.0 license; see `LICENSE`.
 
 <p align="center">
   <img src="logo.jpg" width="128" height="128" style="border-radius: 22%;" alt="LLM Wiki Logo">
@@ -6,7 +29,8 @@
 
 <p align="center">
   <strong>A personal knowledge base that builds itself.</strong><br>
-  LLM reads your documents, builds a structured wiki, and keeps it current.
+  LLM reads your documents, builds a structured wiki, and keeps it current.<br>
+  <em>(This fork serves it over HTTP to any browser on the LAN.)</em>
 </p>
 
 <p align="center">

@@ -43,10 +43,20 @@ async fn proxy_raw(
     AuthUser(_user): AuthUser,
     Json(req): Json<ProxyRawRequest>,
 ) -> Result<Response, ApiError> {
-    // Disallow forwarding to localhost / link-local / private ranges? For a
-    // LAN-only deployment we accept the trust boundary as-is. If exposing
-    // beyond the LAN, add an SSRF allowlist here (e.g., reject 127.0.0.0/8,
-    // 169.254.0.0/16, 10.0.0.0/8, etc.).
+    // SSRF guard: reject URLs that resolve to private/loopback/link-local
+    // ranges before we send. The proxy is a CORS workaround for hitting
+    // third-party LLM/embedding APIs, NOT a generic outbound forwarder.
+    // Without this guard, any authenticated user could pivot through the
+    // server to reach internal services (e.g. cloud metadata endpoints
+    // like 169.254.169.254, sidecar services on localhost, other LAN hosts).
+    //
+    // The guard is bypassed in `cfg(test)` builds because the test suite
+    // uses mockito, which binds to 127.0.0.1. `cfg!(test)` is only true
+    // under `cargo test`; release / dev binaries always enforce.
+    if !cfg!(test) {
+        reject_unsafe_url(&req.url)?;
+    }
+
     let method = req
         .method
         .as_deref()
@@ -117,10 +127,114 @@ async fn proxy_raw(
     Ok(response)
 }
 
+// ── SSRF guard ────────────────────────────────────────────────────────────────
+//
+// Reject URLs whose host resolves to a private, loopback, link-local, or
+// otherwise non-public address before we initiate the forward. This is the
+// proxy's only access-control layer; without it the endpoint becomes a
+// confused-deputy egress for the LAN.
+
+fn reject_unsafe_url(url_str: &str) -> Result<(), ApiError> {
+    let url = url::Url::parse(url_str)
+        .map_err(|e| ApiError::bad_request("BAD_REQUEST", format!("invalid url: {e}")))?;
+
+    match url.scheme() {
+        "http" | "https" => {}
+        other => {
+            return Err(ApiError::bad_request(
+                "BAD_REQUEST",
+                format!("unsupported scheme: {other} (only http/https are allowed)"),
+            ));
+        }
+    }
+
+    let host = url.host_str().ok_or_else(|| {
+        ApiError::bad_request("BAD_REQUEST", "url is missing a host")
+    })?;
+
+    // Direct IP literals: check the address itself.
+    if let Ok(ip) = host.parse::<std::net::IpAddr>() {
+        if is_private_or_special(ip) {
+            return Err(ApiError::bad_request(
+                "BAD_REQUEST",
+                format!(
+                    "url host {host} is in a private/loopback/link-local range and is blocked by the proxy"
+                ),
+            )
+            .with_details(serde_json::json!({ "host": host, "reason": "private_address" })));
+        }
+        return Ok(());
+    }
+
+    // Hostname: resolve and check every resolved address.
+    // This is a best-effort guard. Note: DNS rebinding could in theory let a
+    // host resolve to a public IP on first lookup and a private IP at request
+    // time. For v1 we accept that residual risk; v2 can resolve once and pin
+    // the IP into the outbound request.
+    let host_port = format!("{host}:{}", url.port_or_known_default().unwrap_or(80));
+    let addrs: Vec<std::net::SocketAddr> = std::net::ToSocketAddrs::to_socket_addrs(&host_port)
+        .map_err(|e| {
+            ApiError::bad_request("BAD_REQUEST", format!("dns lookup failed for {host}: {e}"))
+        })?
+        .collect();
+
+    if addrs.is_empty() {
+        return Err(ApiError::bad_request(
+            "BAD_REQUEST",
+            format!("dns lookup returned no addresses for {host}"),
+        ));
+    }
+
+    for sa in &addrs {
+        if is_private_or_special(sa.ip()) {
+            return Err(ApiError::bad_request(
+                "BAD_REQUEST",
+                format!(
+                    "url host {host} resolves to a private/loopback/link-local address ({}) and is blocked by the proxy",
+                    sa.ip()
+                ),
+            )
+            .with_details(serde_json::json!({
+                "host": host,
+                "resolved": sa.ip().to_string(),
+                "reason": "private_address",
+            })));
+        }
+    }
+    Ok(())
+}
+
+fn is_private_or_special(ip: std::net::IpAddr) -> bool {
+    match ip {
+        std::net::IpAddr::V4(v4) => {
+            v4.is_loopback()                  // 127.0.0.0/8
+                || v4.is_private()            // 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
+                || v4.is_link_local()         // 169.254.0.0/16 (cloud metadata!)
+                || v4.is_broadcast()
+                || v4.is_unspecified()        // 0.0.0.0
+                || v4.is_multicast()
+                || v4.octets()[0] == 100 && (v4.octets()[1] & 0xc0) == 64 // 100.64.0.0/10 carrier-grade NAT
+                || v4.octets()[0] == 192 && v4.octets()[1] == 0 && v4.octets()[2] == 2 // 192.0.2.0/24 TEST-NET
+                || v4.octets()[0] == 198 && v4.octets()[1] == 51 && v4.octets()[2] == 100 // 198.51.100.0/24
+                || v4.octets()[0] == 203 && v4.octets()[1] == 0 && v4.octets()[2] == 113 // 203.0.113.0/24
+        }
+        std::net::IpAddr::V6(v6) => {
+            v6.is_loopback()                  // ::1
+                || v6.is_unspecified()        // ::
+                || v6.is_multicast()
+                || (v6.segments()[0] & 0xfe00) == 0xfc00   // fc00::/7 unique-local
+                || (v6.segments()[0] & 0xffc0) == 0xfe80   // fe80::/10 link-local
+                // IPv4-mapped IPv6 (::ffff:0:0/96) — unwrap and recurse.
+                || v6.to_ipv4_mapped().map(|v4| is_private_or_special(std::net::IpAddr::V4(v4))).unwrap_or(false)
+        }
+    }
+}
+
 // ── tests ─────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use axum::body::to_bytes;
     use axum::http::Request;
     use std::sync::Arc;
@@ -150,6 +264,7 @@ mod tests {
         let projects_root = dir.path().join("projects");
         std::fs::create_dir_all(&projects_root).unwrap();
         let cfg = ServerConfig {
+            bind: "127.0.0.1".into(),
             port: 8080,
             projects_root,
             data_root: dir.path().to_path_buf(),
@@ -340,5 +455,51 @@ mod tests {
         let bytes = to_bytes(resp.into_body(), 4096).await.unwrap();
         let v: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
         assert_eq!(v["ok"], true);
+    }
+
+    // Direct unit tests of the SSRF guard — the proxy_raw handler bypasses
+    // it under cfg(test), but the guard logic itself needs coverage so we
+    // don't regress when adding more blocked ranges later.
+
+    #[test]
+    fn ssrf_guard_blocks_loopback_v4() {
+        assert!(reject_unsafe_url("http://127.0.0.1/").is_err());
+        assert!(reject_unsafe_url("http://127.255.0.1:8080/foo").is_err());
+    }
+
+    #[test]
+    fn ssrf_guard_blocks_loopback_v6() {
+        assert!(reject_unsafe_url("http://[::1]/").is_err());
+    }
+
+    #[test]
+    fn ssrf_guard_blocks_link_local_metadata() {
+        // AWS / GCP / Azure metadata endpoint
+        assert!(reject_unsafe_url("http://169.254.169.254/latest/meta-data/").is_err());
+    }
+
+    #[test]
+    fn ssrf_guard_blocks_private_v4() {
+        assert!(reject_unsafe_url("http://10.0.0.1/").is_err());
+        assert!(reject_unsafe_url("http://172.16.0.1/").is_err());
+        assert!(reject_unsafe_url("http://192.168.1.1/").is_err());
+    }
+
+    #[test]
+    fn ssrf_guard_blocks_ipv4_mapped_v6() {
+        // ::ffff:127.0.0.1 — the IPv4-mapped form of loopback
+        assert!(reject_unsafe_url("http://[::ffff:127.0.0.1]/").is_err());
+    }
+
+    #[test]
+    fn ssrf_guard_rejects_non_http_schemes() {
+        assert!(reject_unsafe_url("file:///etc/passwd").is_err());
+        assert!(reject_unsafe_url("gopher://example.com/").is_err());
+    }
+
+    #[test]
+    fn ssrf_guard_rejects_malformed_url() {
+        assert!(reject_unsafe_url("not a url").is_err());
+        assert!(reject_unsafe_url("https:///no-host").is_err());
     }
 }

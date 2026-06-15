@@ -8,6 +8,12 @@ use std::path::PathBuf;
 
 #[derive(Debug, Clone)]
 pub struct ServerConfig {
+    /// Interface to bind the main listener on. Defaults to `127.0.0.1`
+    /// (loopback only). Set `LLM_WIKI_BIND=0.0.0.0` (or a specific LAN IP)
+    /// to expose to other hosts; this is an explicit opt-in because the
+    /// authenticated proxy is reachable to any user with a session, and
+    /// "I started a dev server" should not mean "I exposed it to the LAN".
+    pub bind: String,
     pub port: u16,
     pub projects_root: PathBuf,
     pub data_root: PathBuf,
@@ -25,6 +31,8 @@ pub enum ConfigError {
 
 impl ServerConfig {
     pub fn from_env() -> Result<Self, ConfigError> {
+        let bind = std::env::var("LLM_WIKI_BIND")
+            .unwrap_or_else(|_| "127.0.0.1".to_string());
         let port = match std::env::var("LLM_WIKI_PORT") {
             Ok(s) => s
                 .parse::<u16>()
@@ -49,6 +57,7 @@ impl ServerConfig {
             .unwrap_or_else(|_| "llm_wiki_session".to_string());
 
         Ok(ServerConfig {
+            bind,
             port,
             projects_root,
             data_root,
