@@ -102,17 +102,17 @@ function App() {
     })()
   }, [])
 
-  // Background update check — hydrate persisted user preferences, then
-  // hit GitHub at most once every UPDATE_CHECK_CACHE_MS. Runs 1.5 s
-  // after mount so it doesn't contend with the heaviest startup work
-  // (project load, file tree, vector store init) but still surfaces
-  // a new release in time for the user to notice it during their
-  // first interaction. Silent on failure; the UI in Settings → About
-  // lets the user retry manually.
+  // Background update check is disabled in the browser/LAN fork: the
+  // checker hits GitHub Releases for `nashsu/llm_wiki`, which is the
+  // upstream Tauri desktop app — not this fork. The 403 it returned
+  // on every boot was just GitHub rate-limiting an unauthenticated
+  // request to a repo we don't track. If a fork-level update
+  // mechanism is ever added, wire it here.
   useEffect(() => {
     let cancelled = false
     const timer = setTimeout(async () => {
       if (cancelled) return
+      return // disabled for browser/LAN fork; see comment above
       try {
         const { loadUpdateCheckState, saveUpdateCheckState } = await import(
           "@/lib/project-store"
