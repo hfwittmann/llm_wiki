@@ -1281,7 +1281,7 @@ export function GraphView() {
                         return (
                           <div
                             key={type}
-                            className={`flex items-center gap-2 rounded px-1 py-0.5 transition-colors hover:bg-accent/50 ${isHidden ? "opacity-40" : ""}`}
+                            className={`flex items-center gap-2 rounded px-1 py-0.5 transition-colors hover:bg-accent/50 ${isHidden ? "opacity-70" : ""}`}
                             onMouseEnter={() => setHoveredType(type)}
                             onMouseLeave={() => setHoveredType(null)}
                             onDoubleClick={() => {
@@ -1304,10 +1304,10 @@ export function GraphView() {
                                 boxShadow: `0 0 4px ${hexToRgba(isHidden ? "#94a3b8" : nodeColor(type), 0.4)}`,
                               }}
                             />
-                            <span className={hoveredType === type ? "text-foreground font-medium" : "text-foreground/85"}>
+                            <span className={hoveredType === type ? "text-foreground font-medium" : "text-foreground"}>
                               {label}
                             </span>
-                            <span className="text-muted-foreground ml-auto">{typeCounts[type]}</span>
+                            <span className="text-foreground/70 ml-auto">{typeCounts[type]}</span>
                             {isHidden && <span className="text-muted-foreground/60 text-[10px]">{t("graph.hidden")}</span>}
                           </div>
                         )
