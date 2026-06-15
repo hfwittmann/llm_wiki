@@ -333,8 +333,17 @@ function App() {
       await resetProjectState()
 
       setProject(proj)
+      // Per-project override takes precedence; otherwise fall back to the
+      // user's global setting, and only then to "auto". Without the global
+      // fallback, opening a project that never had a per-project override
+      // saved would silently reset the language to auto-detect — which
+      // mis-fires on Latin-script source documents that happen to contain
+      // a single stray foreign-language diacritic.
       const projectOutputLang = await loadOutputLanguage(proj.id)
-      useWikiStore.getState().setOutputLanguage(projectOutputLang ?? "auto")
+      const globalOutputLang = await loadOutputLanguage()
+      useWikiStore.getState().setOutputLanguage(
+        projectOutputLang ?? globalOutputLang ?? "auto",
+      )
       setSelectedFile(null)
       setActiveView("wiki")
       // Bump data version so any cached graphs/views invalidate
