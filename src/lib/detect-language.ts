@@ -261,14 +261,28 @@ function detectLatinLanguage(text: string): string | null {
     return "Turkish"
   }
 
-  // Polish — distinctive characters
-  if (/[ąćęłńóśźż]/.test(lower)) {
-    return "Polish"
+  // Polish — distinctive characters. Single-char trigger flipped English
+  // documents containing a stray `ć` or `ó` to Polish; use the same
+  // ≥2-distinct-chars-OR-char+word gate that Vietnamese uses.
+  const plCharRe = /[ąćęłńóśźż]/g
+  const plMatches = lower.match(plCharRe)
+  if (plMatches) {
+    const distinctPl = new Set(plMatches).size
+    const hasPlWord = /\b(że|się|jest|który|która|które|oraz|lub|aby|czy|jako|przez|tylko|także|między|nasze)\b/.test(lower)
+    if (distinctPl >= 2 || (distinctPl >= 1 && hasPlWord)) {
+      return "Polish"
+    }
   }
 
-  // Czech/Slovak — háčky and čárky
-  if (/[ěšžřďťňů]/.test(lower)) {
-    return "Czech"
+  // Czech/Slovak — háčky and čárky. Same gate as Polish.
+  const csCharRe = /[ěšžřďťňů]/g
+  const csMatches = lower.match(csCharRe)
+  if (csMatches) {
+    const distinctCs = new Set(csMatches).size
+    const hasCsWord = /\b(že|který|která|které|protože|nebo|jako|aby|však|také|jenom|nějaký|mezi)\b/.test(lower)
+    if (distinctCs >= 2 || (distinctCs >= 1 && hasCsWord)) {
+      return "Czech"
+    }
   }
 
   // Romanian — distinctive characters
@@ -276,9 +290,15 @@ function detectLatinLanguage(text: string): string | null {
     return "Romanian"
   }
 
-  // Hungarian — double acute accents
-  if (/[őű]/.test(lower)) {
-    return "Hungarian"
+  // Hungarian — double acute accents. Same gate.
+  const huCharRe = /[őű]/g
+  const huMatches = lower.match(huCharRe)
+  if (huMatches) {
+    const distinctHu = new Set(huMatches).size
+    const hasHuWord = /\b(és|hogy|vagy|nem|egy|az|ez|van|mint|azonban|mert|mivel|tehát)\b/.test(lower)
+    if (distinctHu >= 2 || (distinctHu >= 1 && hasHuWord)) {
+      return "Hungarian"
+    }
   }
 
   // German — common patterns
