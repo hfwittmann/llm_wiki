@@ -67,8 +67,21 @@ export async function writeFileAtomic(path: string, contents: string): Promise<v
 
 export async function listDirectory(path: string): Promise<FileNode[]> {
   const qs = new URLSearchParams({ path })
-  const resp = await apiCall<{ entries: FileNode[] }>("GET", `/api/v1/fs/list?${qs.toString()}`)
-  return resp.entries
+  // Server returns `{entries: [{name, is_dir, is_project, size, modified_unix}]}`
+  // — name only, no full path. Legacy Tauri version returned absolute paths
+  // per entry, and several callers rely on `entry.path`. Reconstruct it here
+  // by joining the parent (which the caller passed in) with each entry name.
+  type ServerEntry = { name: string; is_dir: boolean }
+  const resp = await apiCall<{ entries: ServerEntry[] }>(
+    "GET",
+    `/api/v1/fs/list?${qs.toString()}`,
+  )
+  const parent = path.replace(/\/+$/, "")
+  return resp.entries.map((e) => ({
+    name: e.name,
+    is_dir: e.is_dir,
+    path: parent === "" ? e.name : `${parent}/${e.name}`,
+  }))
 }
 
 // ── File operations (internal-only stubs) ─────────────────────────────────────
