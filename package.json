@@ -22,6 +22,7 @@
     "@milkdown/plugin-math": "^7.5.9",
     "@milkdown/react": "^7.20.0",
     "@milkdown/theme-nord": "^7.20.0",
+    "@noble/hashes": "^1.8.0",
     "@react-sigma/core": "^5.0.6",
     "@tailwindcss/vite": "^4.2.2",
     "@tauri-apps/api": "^2.11.0",
