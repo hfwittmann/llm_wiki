@@ -30,7 +30,7 @@ export function SourcesView() {
   const setFileTree = useWikiStore((s) => s.setFileTree)
   const llmConfig = useWikiStore((s) => s.llmConfig)
   const sourceWatchConfig = useWikiStore((s) => s.sourceWatchConfig)
-  const dataVersion = useWikiStore((s) => s.dataVersion)
+  // dataVersion intentionally NOT subscribed — see useEffect below.
   const [sources, setSources] = useState<FileNode[]>([])
   const [importing, setImporting] = useState(false)
   const [ingestingPath, setIngestingPath] = useState<string | null>(null)
