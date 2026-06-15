@@ -1,6 +1,5 @@
 import { useState } from "react"
 import { ChevronRight, ChevronDown, File, Folder, FolderOpen } from "lucide-react"
-import { message } from "@tauri-apps/plugin-dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useWikiStore } from "@/stores/wiki-store"
 import type { FileNode } from "@/types/wiki"
@@ -66,16 +65,11 @@ export function FileTree() {
       await openProjectFolder(project.path)
     } catch (err) {
       console.error("[FileTree] open project folder failed:", err)
-      await message(
+      // Phase 6 will replace window.alert with a proper toast/dialog.
+      window.alert(
         t("fileTree.openProjectFolderFailed", {
           defaultValue: "Failed to open the project folder.",
         }),
-        {
-          title: t("fileTree.openProjectFolder", {
-            defaultValue: "Open project folder",
-          }),
-          kind: "error",
-        },
       )
     }
   }

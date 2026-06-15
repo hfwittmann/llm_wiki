@@ -1,6 +1,4 @@
 import { useState, useEffect } from "react"
-import { open } from "@tauri-apps/plugin-dialog"
-import { invoke } from "@tauri-apps/api/core"
 import i18n from "@/i18n"
 import { useWikiStore } from "@/stores/wiki-store"
 import { useReviewStore } from "@/stores/review-store"
@@ -268,11 +266,8 @@ function App() {
         }
         const savedGeneral = await loadGeneralConfig()
         useWikiStore.getState().setGeneralConfig(savedGeneral)
-        try {
-          await invoke<string>("set_close_behavior", { value: savedGeneral.closeBehavior })
-        } catch (err) {
-          console.warn("[general] failed to hydrate close behavior:", err)
-        }
+        // set_close_behavior was a Tauri-only IPC call; no HTTP equivalent.
+        // In the browser/LAN context the close behavior is a no-op.
         const savedLang = await loadLanguage()
         if (savedLang) {
           await i18n.changeLanguage(savedLang)
@@ -421,11 +416,9 @@ function App() {
   }
 
   async function handleOpenProject() {
-    const selected = await open({
-      directory: true,
-      multiple: false,
-      title: "Open Wiki Project",
-    })
+    // TODO(5.7): replace with FolderBrowserDialog when implemented.
+    // Native folder-picker is Tauri-only; in the browser the user types the path.
+    const selected = window.prompt("Enter the path to the wiki project folder:")
     if (!selected) return
     try {
       const proj = await openProject(selected)

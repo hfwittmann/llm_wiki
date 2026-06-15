@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
-import { open } from "@tauri-apps/plugin-dialog"
 import { Plus, FileText, RefreshCw, BookOpen, Trash2, Folder, ChevronRight, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -15,7 +14,6 @@ import {
   deleteSourceFile,
   deleteSourceFolder,
   enqueueSourceIngest,
-  importSourceFiles,
   importSourceFolder,
 } from "@/lib/source-lifecycle"
 
@@ -97,61 +95,16 @@ export function SourcesView() {
   async function handleImport() {
     if (!project) return
 
-    const selected = await open({
-      multiple: true,
-      title: t("sources.importSourceFiles"),
-      filters: [
-        {
-          name: "Documents",
-          extensions: [
-            "md", "mdx", "txt", "rtf", "pdf",
-            "html", "htm", "xml",
-            "doc", "docx", "xls", "xlsx", "ppt", "pptx",
-            "odt", "ods", "odp", "epub", "pages", "numbers", "key",
-          ],
-        },
-        {
-          name: "Data",
-          extensions: ["json", "jsonl", "csv", "tsv", "yaml", "yml", "ndjson"],
-        },
-        {
-          name: "Code",
-          extensions: [
-            "py", "js", "ts", "jsx", "tsx", "rs", "go", "java",
-            "c", "cpp", "h", "rb", "php", "swift", "sql", "sh",
-          ],
-        },
-        {
-          name: "Images",
-          extensions: ["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "tiff", "avif", "heic"],
-        },
-        {
-          name: "Media",
-          extensions: ["mp4", "webm", "mov", "avi", "mkv", "mp3", "wav", "ogg", "flac", "m4a"],
-        },
-        { name: "All Files", extensions: ["*"] },
-      ],
-    })
-
-    if (!selected || selected.length === 0) return
-
-    setImporting(true)
-    const paths = Array.isArray(selected) ? selected : [selected]
-    try {
-      await importSourceFiles(project, paths, llmConfig, sourceWatchConfig)
-      await loadSources()
-    } finally {
-      setImporting(false)
-    }
+    // TODO(5.7): replace with FolderBrowserDialog / file picker when implemented.
+    // Native file-picker is Tauri-only; in the browser context this is a no-op stub.
+    window.alert("File picker coming soon. Use the folder import or drag & drop when available.")
   }
 
   async function handleImportFolder() {
     if (!project) return
 
-    const selected = await open({
-      directory: true,
-      title: t("sources.importSourceFolder"),
-    })
+    // TODO(5.7): replace with FolderBrowserDialog when implemented.
+    const selected = window.prompt(t("sources.importSourceFolder"))
 
     if (!selected || typeof selected !== "string") return
 

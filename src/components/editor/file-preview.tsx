@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from "react"
-import { convertFileSrc } from "@tauri-apps/api/core"
+import { fileRawUrl } from "@/lib/api"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import remarkMath from "remark-math"
@@ -85,7 +85,8 @@ function extractedTextLabel(filePath: string): string {
 }
 
 function ImagePreview({ filePath, fileName }: { filePath: string; fileName: string }) {
-  const src = convertFileSrc(filePath)
+  const projectPath = useWikiStore((s) => s.project?.path ?? "")
+  const src = fileRawUrl(projectPath, filePath)
   return (
     <div className="flex h-full flex-col p-6">
       <div className="mb-4 text-xs text-muted-foreground">{filePath}</div>
@@ -101,7 +102,8 @@ function ImagePreview({ filePath, fileName }: { filePath: string; fileName: stri
 }
 
 function VideoPreview({ filePath, fileName }: { filePath: string; fileName: string }) {
-  const src = convertFileSrc(filePath)
+  const projectPath = useWikiStore((s) => s.project?.path ?? "")
+  const src = fileRawUrl(projectPath, filePath)
   return (
     <div className="flex h-full flex-col p-6">
       <div className="mb-4 text-xs text-muted-foreground">{filePath}</div>
@@ -119,7 +121,8 @@ function VideoPreview({ filePath, fileName }: { filePath: string; fileName: stri
 }
 
 function AudioPreview({ filePath, fileName }: { filePath: string; fileName: string }) {
-  const src = convertFileSrc(filePath)
+  const projectPath = useWikiStore((s) => s.project?.path ?? "")
+  const src = fileRawUrl(projectPath, filePath)
   return (
     <div className="flex h-full flex-col items-center justify-center gap-4 p-6">
       <div className="text-xs text-muted-foreground">{filePath}</div>

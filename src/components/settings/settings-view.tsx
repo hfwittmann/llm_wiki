@@ -16,7 +16,6 @@ import {
   FileText,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { invoke } from "@tauri-apps/api/core"
 import i18n from "@/i18n"
 import { Button } from "@/components/ui/button"
 import { useWikiStore } from "@/stores/wiki-store"
@@ -402,34 +401,16 @@ export function SettingsView() {
           await stopProjectFileSync()
         }
       }
-      // Apply the proxy env vars LIVE so the next outbound request
-      // picks them up — no app restart needed. tauri-plugin-http
-      // builds a fresh reqwest client per fetch and reqwest reads
-      // env vars at build time, so changing them here is enough.
-      try {
-        await invoke<string>("set_proxy_env", { config: newProxy })
-      } catch (err) {
-        console.warn("[proxy] live update failed; restart will still apply:", err)
-      }
+      // set_proxy_env was a Tauri-only IPC call to update env vars in the Rust process.
+      // In the browser/LAN context, proxy settings apply server-side — no client action needed.
 
       await saveMineruConfig(newMineruConfig)
 
-      // The Rust side reads `apiConfig.{enabled,token,mcpEnabled}` from this
-      // same `app-state.json` via a 5s cache, so saved changes propagate within
-      // that window without any IPC round-trip.
+      // The server reads apiConfig from app-state.json on its own schedule.
       await saveApiConfig(newApiConfig)
-      try {
-        await invoke<string>("api_server_reload_config")
-      } catch (err) {
-        console.warn("[api] failed to reload API server config cache:", err)
-      }
 
       await saveGeneralConfig(newGeneralConfig)
-      try {
-        await invoke<string>("set_close_behavior", { value: newGeneralConfig.closeBehavior })
-      } catch (err) {
-        console.warn("[general] failed to update close behavior:", err)
-      }
+      // set_close_behavior was a Tauri-only IPC call; no HTTP equivalent.
 
       if (draft.uiLanguage !== i18n.language) {
         await i18n.changeLanguage(draft.uiLanguage)

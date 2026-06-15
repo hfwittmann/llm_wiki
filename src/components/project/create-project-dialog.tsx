@@ -1,6 +1,5 @@
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
-import { open } from "@tauri-apps/plugin-dialog"
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog"
@@ -39,11 +38,8 @@ export function CreateProjectDialog({ open: isOpen, onOpenChange, onCreated }: C
   const setOutputLanguage = useWikiStore((s) => s.setOutputLanguage)
 
   async function handleBrowse() {
-    const selected = await open({
-      directory: true,
-      multiple: false,
-      title: t("project.browse"),
-    })
+    // TODO(5.7): replace with FolderBrowserDialog when implemented.
+    const selected = window.prompt(t("project.browse"))
     if (selected) {
       setPath(selected)
     }
