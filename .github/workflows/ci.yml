@@ -52,6 +52,10 @@ jobs:
       - name: Check frontend build
         run: npx vite build
 
-      - name: Check Rust build
+      - name: Check Rust build (server binary)
         working-directory: src-tauri
-        run: cargo build
+        run: cargo build --bin llm-wiki-server
+
+      - name: Run Rust tests
+        working-directory: src-tauri
+        run: cargo test --lib --bin llm-wiki-server
