@@ -9,7 +9,7 @@ use serde::Deserialize;
 use crate::http::auth::AuthUser;
 use crate::http::error::ApiError;
 use crate::http::AppState;
-use crate::storage::paths::resolve_under;
+use crate::storage::paths::{resolve_under, resolve_project_path};
 
 pub fn fs_browser_router() -> Router<AppState> {
     Router::new()
@@ -36,7 +36,10 @@ async fn list(
             .canonicalize()
             .map_err(|e| ApiError::internal(format!("projects_root not canonicalizable: {e}")))?
     } else {
-        resolve_under(&state.config.projects_root, &q.path).map_err(|e| {
+        // `resolve_project_path` accepts both relative and absolute paths
+        // (the latter must be under projects_root). The migrated frontend's
+        // legacy `listDirectory(absolutePath)` callers send absolute paths.
+        resolve_project_path(&state.config.projects_root, &q.path).map_err(|e| {
             ApiError::bad_request("PATH_ESCAPE", e.to_string())
                 .with_details(serde_json::json!({ "requested": q.path }))
         })?

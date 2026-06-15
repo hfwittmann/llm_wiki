@@ -19,7 +19,14 @@ pub fn files_router() -> Router<AppState> {
 
 #[derive(Debug, Deserialize)]
 struct RawQuery {
-    project_path: String,
+    /// Two accepted shapes, in priority order:
+    ///   (a) `project_path` + `path` — project_path can be absolute (under
+    ///       projects_root) or relative; `path` is project-relative.
+    ///   (b) Only `path` — must be an absolute path under projects_root.
+    /// Legacy callers in the migrated frontend send (b); newer callers should
+    /// prefer (a) because it's path-safer.
+    #[serde(default)]
+    project_path: Option<String>,
     path: String,
 }
 
@@ -28,20 +35,37 @@ async fn raw(
     AuthUser(_user): AuthUser,
     Query(q): Query<RawQuery>,
 ) -> Result<Response, ApiError> {
-    let project_root =
-        resolve_project_path(&state.config.projects_root, &q.project_path).map_err(|e| {
-            ApiError::bad_request("PATH_ESCAPE", e.to_string())
-                .with_details(serde_json::json!({ "requested": q.project_path }))
-        })?;
-    let file_path = resolve_under(&project_root, &q.path).map_err(|e| match e {
-        PathError::NotFound => ApiError::new(
-            StatusCode::NOT_FOUND,
-            "NOT_FOUND",
-            format!("file not found: {}", q.path),
-        ),
-        _ => ApiError::bad_request("PATH_ESCAPE", e.to_string())
-            .with_details(serde_json::json!({ "requested": q.path })),
-    })?;
+    let projects_root = &state.config.projects_root;
+
+    let file_path = match q.project_path.as_deref() {
+        Some(pp) if !pp.is_empty() => {
+            let project_root = resolve_project_path(projects_root, pp).map_err(|e| {
+                ApiError::bad_request("PATH_ESCAPE", e.to_string())
+                    .with_details(serde_json::json!({ "requested": pp }))
+            })?;
+            resolve_under(&project_root, &q.path).map_err(|e| match e {
+                PathError::NotFound => ApiError::new(
+                    StatusCode::NOT_FOUND,
+                    "NOT_FOUND",
+                    format!("file not found: {}", q.path),
+                ),
+                _ => ApiError::bad_request("PATH_ESCAPE", e.to_string())
+                    .with_details(serde_json::json!({ "requested": q.path })),
+            })?
+        }
+        _ => {
+            // Single absolute path — must be under projects_root.
+            resolve_project_path(projects_root, &q.path).map_err(|e| match e {
+                PathError::NotFound => ApiError::new(
+                    StatusCode::NOT_FOUND,
+                    "NOT_FOUND",
+                    format!("file not found: {}", q.path),
+                ),
+                _ => ApiError::bad_request("PATH_ESCAPE", e.to_string())
+                    .with_details(serde_json::json!({ "requested": q.path })),
+            })?
+        }
+    };
 
     if !file_path.is_file() {
         return Err(ApiError::new(
