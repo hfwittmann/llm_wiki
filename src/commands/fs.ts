@@ -1,4 +1,4 @@
-import { apiCall, fileRawUrl } from "@/lib/api"
+import { apiCall, apiFetch, fileRawUrl } from "@/lib/api"
 import type { FileNode, WikiProject } from "@/types/wiki"
 import { ensureProjectId, upsertProjectInfo } from "@/lib/project-identity"
 import { isAbsolutePath } from "@/lib/path-utils"
@@ -42,8 +42,24 @@ export async function readFile(
     ? "/api/v1/files/extracted-text"
     : "/api/v1/files/raw"
   const qs = new URLSearchParams({ path })
-  const text = await apiCall<string>("GET", `${endpoint}?${qs.toString()}`)
-  return text
+  // Use apiFetch + .text() instead of apiCall: apiCall auto-parses JSON when
+  // Content-Type is application/json, which would turn .json files into parsed
+  // objects (callers expect raw text and JSON.parse it themselves).
+  const resp = await apiFetch("GET", `${endpoint}?${qs.toString()}`)
+  if (!resp.ok) {
+    const body = await resp.text().catch(() => "")
+    let code = "UNKNOWN"
+    let message = resp.statusText
+    try {
+      const parsed = body ? (JSON.parse(body) as { error?: { code?: string; message?: string } }) : undefined
+      code = parsed?.error?.code ?? code
+      message = parsed?.error?.message ?? message
+    } catch {
+      // body wasn't JSON
+    }
+    throw new Error(`readFile ${resp.status} ${code}: ${message}`)
+  }
+  return await resp.text()
 }
 
 export async function writeFile(path: string, contents: string): Promise<void> {
